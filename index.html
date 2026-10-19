@@ -1,0 +1,1150 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Histogram Transform Lab</title>
+<style>
+/* ==== Theme and base elements ==== */
+:root{--bg:#f3f2ee;--card:#fff;--ink:#1d2024;--mut:#6d7178;--line:#d9d8d2;--acc:#0b6e69;--hist:#c6cbd0;--curve:#d4452b;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121416;--card:#1b1e21;--ink:#e8e9ea;--mut:#8f949b;--line:#32363b;--acc:#4fc3bb;--hist:#3c434a;--curve:#ff7a5c}}
+:root[data-theme="dark"]{--bg:#121416;--card:#1b1e21;--ink:#e8e9ea;--mut:#8f949b;--line:#32363b;--acc:#4fc3bb;--hist:#3c434a;--curve:#ff7a5c}
+*{box-sizing:border-box}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;min-height:100%;background:var(--bg);color:var(--ink);font:14px/1.45 "IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif}
+header{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--card);position:sticky;top:env(safe-area-inset-top,0px);z-index:5}
+h1{font-size:16px;margin:0;font-weight:600}
+button,select{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:6px;padding:5px 10px;cursor:pointer}
+button:hover,select:hover{border-color:var(--acc)}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.mut{color:var(--mut)}
+main{min-width:0}
+[hidden]{display:none!important}
+/* ==== Layout, tabs and the session strip ==== */
+.layout{display:grid;grid-template-columns:120px 1fr;gap:16px;padding:16px;align-items:start}
+@media(max-width:700px){.layout{grid-template-columns:1fr}.side{flex-direction:row!important;overflow-x:auto}}
+.side{display:flex;flex-direction:column;gap:10px;position:sticky;top:70px}
+.thumb{position:relative;border:2px solid var(--line);border-radius:4px;background:var(--card);padding:0;width:96px;height:80px;flex:none;overflow:hidden}
+.thumb.on{border-color:var(--acc)}
+.thumb canvas{width:100%;height:100%;object-fit:cover;display:block;image-rendering:pixelated}
+.thumb .x{position:absolute;top:2px;right:2px;font-size:11px;padding:0 5px;line-height:16px;background:var(--card)}
+.empty{border:2px dashed var(--line);border-radius:8px;padding:48px 20px;text-align:center;color:var(--mut);cursor:pointer;transition:border-color .15s}
+.empty b{color:var(--ink);font-size:16px;display:block;margin-bottom:6px}
+.empty:hover,.empty:focus-visible{border-color:var(--acc)}
+.tabs{display:flex;gap:4px;padding:6px 16px 0;border-bottom:1px solid var(--line);background:var(--card);overflow-x:auto}
+.tabs button{border:0;border-bottom:2px solid transparent;border-radius:0;background:none;padding:8px 14px;white-space:nowrap}
+.tabs button[aria-selected=true]{border-bottom-color:var(--acc);color:var(--acc);font-weight:600}
+.thumb.add{border-style:dashed;font-size:30px;line-height:1;color:var(--mut);display:flex;align-items:center;justify-content:center}
+.thumb .emp{display:flex;height:100%;align-items:center;justify-content:center;font-size:12px;color:var(--mut)}
+/* ==== Shared controls: cards, rows, chips, menus, segmented buttons, number inputs ==== */
+.sw{display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none}
+.sw input{accent-color:var(--acc);width:16px;height:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;margin:0 0 14px;padding:12px}
+.card h2{font-size:13px;margin:0 0 10px;display:flex;gap:10px;align-items:center;font-weight:600}
+.card h2 .sp{flex:1}
+.row{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start}
+.col{display:flex;flex-direction:column;gap:6px;min-width:0}
+canvas.v{display:block;max-width:100%;border:1px solid var(--line);border-radius:4px;background:var(--bg)}
+.cap{font-size:11px;color:var(--mut)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{min-width:36px;font-variant-numeric:tabular-nums}
+.chip[aria-pressed=true]{background:var(--acc);color:var(--bg);border-color:var(--acc)}
+.row2{display:flex;gap:8px;align-items:flex-start}
+.row2 canvas.v{width:calc(50% - 4px);max-height:none;height:auto}
+.menu{position:absolute;right:0;top:100%;z-index:6;background:var(--card);border:1px solid var(--line);border-radius:6px;padding:4px;min-width:240px;box-shadow:0 4px 14px #0003}
+.menu button{display:block;width:100%;text-align:left;border:0;background:none}
+.menu button:disabled{opacity:.45;cursor:not-allowed}
+.mh{display:flex;justify-content:space-between;align-items:center;position:relative;margin-bottom:6px}
+.ibtn{padding:6px 9px;display:inline-flex}
+.col>canvas.v{align-self:flex-start;max-width:100%}
+.sw input.sq,.sw input[type=number],input.sq{width:44px;height:44px;box-sizing:border-box;padding:0;text-align:center;font:600 15px monospace;border:1.5px solid var(--mut);border-radius:6px;background:var(--card);color:var(--ink);box-shadow:inset 0 1px 3px #0003;-moz-appearance:textfield}
+.sw input.sq:focus,.sw input[type=number]:focus{border-color:var(--acc)}
+input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+button[title^='Use']{width:44px;height:44px;padding:0;font-size:16px}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:8px;overflow:hidden;width:max-content;max-width:100%}
+.seg button{border:0;border-radius:0;background:var(--card);padding:5px 12px;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed=true]{background:var(--acc);color:var(--bg);font-weight:600}
+/* ==== Histogram tab ==== */
+.img{max-height:300px;width:auto;height:auto;background:repeating-conic-gradient(#8883 0 25%,transparent 0 50%) 0 0/12px 12px}
+.ctl{display:grid;grid-template-columns:36px 1fr 46px;gap:8px;align-items:center;font-size:12px}
+.ctl input[type=range]{width:100%;accent-color:var(--acc)}
+.ctl output{text-align:right;font-variant-numeric:tabular-nums}
+.add{margin-top:10px}
+.picker{display:grid;grid-template-columns:repeat(auto-fill,minmax(124px,1fr));gap:10px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
+.tile{display:flex;flex-direction:column;gap:6px;align-items:center;padding:6px;text-align:center;font-size:12px;line-height:1.25}
+.tile canvas{display:block;max-width:100%}
+.tile .c{width:112px;height:112px;border:1px solid var(--line);border-radius:3px;background:var(--bg)}
+.tile .r{width:auto;height:auto;max-width:112px;max-height:84px;border-radius:2px}
+/* ==== Bit-plane tab ==== */
+.bgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(320px,100%),1fr));gap:14px}
+.bgrid .card{margin:0}
+/* ==== Kernels tab ==== */
+body[data-tab=kern] #pdf,body[data-tab=kern] #grayw{display:none}
+.km{display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 8px}
+.km pre{margin:0;font:12px/1.15 monospace}
+.ked{display:grid;gap:3px}
+.kc{width:32px;height:32px;padding:0;font:600 14px monospace}
+.kc[data-v='1']{background:var(--acc);color:var(--bg);border-color:var(--acc)}
+.kc[data-v='0']{background:var(--curve);color:var(--bg);border-color:var(--curve)}
+.kcv{width:100%;max-width:480px;height:auto;touch-action:none;cursor:crosshair}
+.kcol{flex:1 1 360px;max-width:480px;min-width:0}
+.tcells{display:flex;flex-wrap:wrap;gap:4px}
+.tc{display:flex;flex-direction:column;align-items:center;gap:2px}
+.tc input{width:38px;height:38px;box-sizing:border-box;padding:0;text-align:center;font:600 13px monospace;border:1.5px solid var(--mut);border-radius:6px;background:var(--card);color:var(--ink)}
+.tc.chg input{box-shadow:0 0 0 2px var(--acc)}
+.tc.ed input{background:color-mix(in srgb,var(--curve) 22%,var(--card))}
+.tc.win input,.tc.win .tco{box-shadow:0 0 0 3px var(--ink)}
+.tco{width:38px;height:38px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;border:1.5px dashed var(--mut);border-radius:6px;font:600 13px monospace;color:var(--mut)}
+.tlab{height:38px;display:flex;align-items:center}
+@keyframes kpulse{0%{box-shadow:0 0 0 0 var(--acc)}50%{box-shadow:0 0 0 7px color-mix(in srgb,var(--acc) 30%,transparent)}100%{box-shadow:0 0 0 0 transparent}}
+.pulse{animation:kpulse .7s ease-out 2}
+.kwrap{position:relative;width:100%;max-width:480px}
+.kghost{position:absolute;pointer-events:none;opacity:0;transition:opacity .3s ease}
+.kghost.on{opacity:1}
+canvas.kcv{background:transparent;border-color:transparent}
+.kpulse{position:absolute;pointer-events:none;border:3px solid var(--acc);border-radius:4px;animation:kring 1.1s ease-out infinite}
+@keyframes kring{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--acc) 75%,transparent)}100%{box-shadow:0 0 0 14px transparent}}
+.km[aria-pressed=true]{border-color:var(--acc);box-shadow:0 0 0 2px var(--acc) inset;background:color-mix(in srgb,var(--acc) 14%,var(--card))}
+.kact{flex-basis:100%;font-size:12px;margin-bottom:6px}
+.kpanel{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-top:10px;background:color-mix(in srgb,var(--acc) 5%,var(--card))}
+.kph{flex-basis:100%;font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--acc);margin:0 0 4px}
+.kg{display:flex;flex-direction:column;gap:3px}
+.kgl{font-size:11px;color:var(--mut)}
+/* ==== Otsu tab ==== */
+body[data-tab=otsu] #pdf{display:none}
+.ostat{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin:8px 0}
+.ostat div{border:1px solid var(--line);border-radius:8px;padding:6px 10px}
+.ostat b{display:block;font:600 16px monospace}
+.dstep{display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--line);line-height:1.65}
+.dn{flex:none;width:24px;height:24px;border-radius:50%;background:var(--acc);color:var(--bg);display:flex;align-items:center;justify-content:center;font:600 12px monospace}
+.dtab{border-collapse:collapse;margin:6px 0;font:13px monospace}
+.dtab th,.dtab td{border:1px solid var(--line);padding:2px 12px;text-align:right}
+.dtab tr.hl{background:color-mix(in srgb,var(--acc) 18%,transparent)}
+.dtab tr.cur td{font-weight:700}
+.dstep mjx-container,.ostat mjx-container{color:var(--ink)}
+.dstep mjx-container[display]{margin:.5em 0!important}
+.dstep code{font:13px monospace}
+.otip{position:absolute;top:6px;z-index:5;pointer-events:none;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12px;line-height:1.6;box-shadow:0 4px 14px #0003;white-space:nowrap}
+.otip hr{border:0;border-top:1px solid var(--line);margin:4px 0}
+.otip mjx-container{color:var(--ink)}
+.owrap canvas.v{display:block}
+.ylab{position:relative;flex:none;width:22px}
+.ylab>span{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) rotate(-90deg);white-space:nowrap;font-size:12px;color:var(--mut)}
+.xlab{text-align:center;font-size:12px;color:var(--mut);max-width:700px;margin-top:3px;padding-left:28px}
+</style><script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script><script>window.MathJax={startup:{typeset:false},svg:{fontCache:'none'}};</script>
+<script async src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-svg.js" onload="MathJax.startup.promise.then(function(){window.mjReady=true;document.head.appendChild(MathJax.svgStylesheet());if(typeof Core!=='undefined'&&App.tab==='otsu')Core.sync()})"></script>
+</head>
+<body>
+<header>
+  <h1>Histogram transform lab</h1>
+  <label class="sw" id="grayw"><input type="checkbox" id="gray" checked> Convert to grayscale (RGB → gray)</label>
+  <button id="pick">Open image…</button><input type="file" id="file" accept="image/*" hidden>
+  <button id="pdf" hidden disabled>Export session as PDF</button><span class="mut" id="st"></span>
+  <button id="undo" style="margin-left:auto;display:inline-flex;padding:6px" aria-label="Undo" title="Undo (Ctrl+Z)" disabled></button><button id="redo" style="display:inline-flex;padding:6px" aria-label="Redo" title="Redo (Ctrl+Y or Ctrl+Shift+Z)" disabled></button><button id="theme" style="display:inline-flex;padding:6px" aria-label="Toggle light or dark theme" title="Toggle light or dark theme"></button>
+  <span class="mut">or paste with Ctrl/Cmd+V, or drop an image</span>
+</header>
+<nav class="tabs" role="tablist"><button role="tab" data-tab="hist" aria-selected="true">Histogram transforms</button><button role="tab" data-tab="bits" aria-selected="false">Bit-plane slicing</button><button role="tab" data-tab="kern" aria-selected="false">Kernels &amp; morphology</button><button role="tab" data-tab="otsu" aria-selected="false">Otsu threshold</button></nav>
+<div class="layout">
+  <div class="side" id="side"></div>
+  <main id="main"></main>
+</div>
+<script>
+/* Histogram transform lab.
+   Layout of this script, in load order (each section only uses sections above it):
+     App      shared state: the active tab and its sessions
+     Algos    pure math, no DOM
+     Core     sessions, persistence, undo/redo, tabs, theme, PDF helpers, tab registry
+     HistTab, BitsTab, KernTab, OtsuTab   one per tab; each ends with registerTab(...)
+     Boot     first render and restore
+   Every section is a namespace object; each starts by importing what it needs from the sections above. */
+
+/* ==== App: shared state ========================================================================== */
+// The active tab's sessions live in App.sessions/App.cur; the other tabs' are parked in Core's ST until switched to.
+const App={sessions:[],cur:null,nid:1,tab:'hist'};
+
+/* ==== 1. ALGOS: pure math, no DOM ===================================================================== */
+const Algos=(()=>{
+const cdfOf=h=>{if(h._c)return h._c;const N=h.reduce((a,b)=>a+b,0)||1;let s=0,mn=0;const c=new Array(256);for(let i=0;i<256;i++){s+=h[i];c[i]=s;if(!mn&&s)mn=s}return h._c=c.map(v=>N===mn?0:Math.max(0,(v-mn)/(N-mn)*255))};
+const meanOf=h=>{if(h._m!=null)return h._m;let n=0,s=0;h.forEach((v,i)=>{n+=v;s+=v*i});return h._m=n?s/n:128};
+const lohi=(h,q)=>{const k='_l'+q;if(h[k])return h[k];const N=h.reduce((a,b)=>a+b,0),t=N*q/100;let s=0,lo=0,hi=255;for(let i=0;i<256;i++){s+=h[i];if(s>t){lo=i;break}}s=0;for(let i=255;i>=0;i--){s+=h[i];if(s>t){hi=i;break}}return h[k]=[lo,hi]};
+const SF=(r,p)=>p.B<=p.A?(r<p.A?p.va:p.vb):r<=p.A?p.va:r>=p.B?p.vb:p.va+(r-p.A)*(p.vb-p.va)/(p.B-p.A);
+const RP=(a,b)=>[['A','A',0,255,1,a],['B','B',0,255,1,b],['d','Δ',-255,255,1,0],['o','Out',0,2,1,0,'sel',['Black','Keep original','Fixed level']],['v','Lvl',0,255,1,0]];
+const RF=(r,p)=>r>=p.A&&r<=p.B?r+p.d:(p.o===0?0:p.o===1?r:p.v);
+const TR={
+ linear:{n:'Linear (identity)',p:[],f:r=>r},
+ section:{n:'Linear section',p:[['A','A',0,255,1,64],['B','B',0,255,1,160],['h','Δ',-255,255,1,70]],f:(r,p)=>r>=p.A&&r<=p.B?r+p.h:r},
+ negative:{n:'Negative',p:[],f:r=>255-r},
+ log:{n:'Log',p:[],f:r=>255*Math.log(1+r)/Math.log(256)},
+ invlog:{n:'Inverse log (exponential)',p:[],f:r=>255*(Math.pow(256,r/255)-1)/255},
+ gamma:{n:'Gamma',p:[['g','γ',-140,140,1,-35,'log']],f:(r,p)=>255*Math.pow(r/255,p.g)},
+ nroot:{n:'nth root',p:[['n','n',1,10,.1,2]],f:(r,p)=>255*Math.pow(r/255,1/p.n)},
+ npower:{n:'nth power',p:[['n','n',1,10,.1,2]],f:(r,p)=>255*Math.pow(r/255,p.n)},
+ binary:{n:'Binary',p:[['t','T',0,255,1,128],['h','H',0,255,1,255]],f:(r,p)=>r>=p.t?p.h:0},
+ range:{n:'Range keep (L1: A–B)',p:RP(80,160),f:RF},
+ rangeHi:{n:'Keep above A (L2)',p:RP(100,255),f:RF},
+ rangeLo:{n:'Keep below B (L3)',p:RP(0,160),f:RF},
+ equalize:{n:'Histogram equalization',p:[],f:(r,p,h)=>h?cdfOf(h)[r]:r},
+ autostretch:{n:'Auto stretch (min to max)',p:[['q','clip',0,20,.5,0]],f:(r,p,h)=>{if(!h)return r;const[lo,hi]=lohi(h,p.q);return hi<=lo?r:r<=lo?0:r>=hi?255:(r-lo)*255/(hi-lo)}},
+ squeeze:{n:'Contrast squeeze',p:[['A','a',0,255,1,0],['B','b',0,255,1,255],['va','v_a',0,255,1,70],['vb','v_b',0,255,1,185]],f:SF},
+ centershift:{n:'Center shift (move the mean)',p:[['c','C',0,255,1,128]],f:(r,p,h)=>r+(p.c-(h?meanOf(h):p.c))},
+ stretch:{n:'Contrast stretch (clipped ramp)',p:[['A','a',0,255,1,70],['B','b',0,255,1,150],['va','v_a',0,255,1,0],['vb','v_b',0,255,1,180]],
+  f:(r,p)=>p.B<=p.A?(r<p.A?p.va:p.vb):r<=p.A?p.va:r>=p.B?p.vb:p.va+(r-p.A)*(p.vb-p.va)/(p.B-p.A)},
+ bsection:{n:'Binary section',p:[['A','A',0,255,1,80],['B','B',0,255,1,170],['h','H',0,255,1,255]],f:(r,p)=>r>=p.A&&r<=p.B?p.h:0}
+};
+const gv=v=>Math.pow(10,v/100); // gamma slider -> value (0.04..25)
+function lum(d,i){return Math.round(.299*d[i]+.587*d[i+1]+.114*d[i+2])}
+function hist(d){const h=new Array(256).fill(0);for(let i=0;i<d.length;i+=4)h[lum(d,i)]++;return h}
+function toGray(d){const o=new Uint8ClampedArray(d.length);for(let i=0;i<d.length;i+=4){const y=lum(d,i);o[i]=o[i+1]=o[i+2]=y;o[i+3]=d[i+3]}return o}
+function lutOf(n){const t=TR[n.type],p={};t.p.forEach(s=>{p[s[0]]=s[6]==='log'?gv(n.v[s[0]]):n.v[s[0]]});
+ const l=new Uint8Array(256);for(let r=0;r<256;r++)l[r]=Math.max(0,Math.min(255,Math.round(t.f(r,p,n.inH))));return l}
+function applyLut(d,l){const o=new Uint8ClampedArray(d.length);for(let i=0;i<d.length;i+=4){o[i]=l[d[i]];o[i+1]=l[d[i+1]];o[i+2]=l[d[i+2]];o[i+3]=d[i+3]}return o}
+const bitLut=k=>{const l=new Uint8Array(256);for(let r=0;r<256;r++)l[r]=(r>>(k-1))&1?255:0;return l};
+const maskLut=(m,norm)=>{const l=new Uint8Array(256);if(m)for(let r=0;r<256;r++)l[r]=norm?Math.round((r&m)*255/m):r&m;return l};
+const lumLut=(d,l)=>{const o=new Uint8ClampedArray(d.length);for(let i=0;i<d.length;i+=4){const v=l[lum(d,i)];o[i]=o[i+1]=o[i+2]=v;o[i+3]=d[i+3]}return o};
+const kIn=(G,x,y)=>x>=0&&y>=0&&x<G.W&&y<G.H;
+function kbox(sh){if(sh.t==='free'){const X=sh.pts.map(p=>p[0]),Y=sh.pts.map(p=>p[1]);return[Math.min(...X),Math.min(...Y),Math.max(...X),Math.max(...Y)]}
+ return[Math.min(sh.a[0],sh.b[0]),Math.min(sh.a[1],sh.b[1]),Math.max(sh.a[0],sh.b[0]),Math.max(sh.a[1],sh.b[1])]}
+function kcells(G,sh){const{H:KH,W:KW}=G;
+ const out=new Uint8Array(KW*KH),put=(x,y)=>{if(kIn(G,x,y))out[y*KW+x]=1};
+ if(sh.t==='free'){const P=sh.pts;for(let i=0;i<P.length;i++){const[x0,y0]=P[i],[x1,y1]=P[i+1]||P[i],n=Math.max(Math.abs(x1-x0),Math.abs(y1-y0),1);
+  for(let j=0;j<=n;j++)put(Math.round(x0+(x1-x0)*j/n),Math.round(y0+(y1-y0)*j/n))}return out}
+ const[x0,y0,x1,y1]=kbox(sh),cx=(x0+x1+1)/2,cy=(y0+y1+1)/2,rx=(x1-x0+1)/2,ry=(y1-y0+1)/2;
+ const inn=(x,y,ax,ay)=>{if(ax<=0||ay<=0)return false;const u=Math.abs(x+.5-cx)/ax,v=Math.abs(y+.5-cy)/ay;return sh.t==='ellipse'?u*u+v*v<=1:sh.t==='diamond'?u+v<=1:u<=1&&v<=1};
+ for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++)if(inn(x,y,rx,ry)&&(sh.fill||!inn(x,y,rx-1,ry-1)))put(x,y);
+ return out}
+function kraster(G,k){const{H:KH,W:KW}=G;const g=new Uint8Array(KW*KH);k.shapes.forEach(sh=>{const c=kcells(G,sh);for(let i=0;i<c.length;i++)if(c[i])g[i]=1});return g}
+function kmorph(G,g,K,mode){const{H:KH,W:KW}=G;const n=K.length,r=n>>1,o=new Uint8Array(g.length),has=K.some(row=>row.includes(1));
+ for(let y=0;y<KH;y++)for(let x=0;x<KW;x++){let ok=has,any=false;
+  for(let j=0;j<n;j++)for(let i=0;i<n;i++){if(K[j][i]!==1)continue;const dx=i-r,dy=j-r,e=mode==='e',xx=e?x+dx:x-dx,yy=e?y+dy:y-dy,v=kIn(G,xx,yy)&&g[yy*KW+xx]===1;if(e&&!v)ok=false;if(!e&&v)any=true}
+  o[y*KW+x]=mode==='e'?(ok?1:0):(any?1:0)}
+ return o}
+function khm(G,g,K){const{H:KH,W:KW}=G;const n=K.length,r=n>>1,o=new Uint8Array(g.length);
+ for(let y=0;y<KH;y++)for(let x=0;x<KW;x++){let ok=true,cnt=0;
+  for(let j=0;j<n;j++)for(let i=0;i<n;i++){const c=K[j][i];if(c<0)continue;cnt++;const xx=x+i-r,yy=y+j-r;if((kIn(G,xx,yy)?g[yy*KW+xx]:0)!==c)ok=false}
+  o[y*KW+x]=ok&&cnt?1:0}
+ return o}
+function kout(G,k,g){const K=k.K;
+ switch(k.op){case 'dilate':return{t:'bin',v:kmorph(G,g,K,'d')};case 'hm':return{t:'bin',v:khm(G,g,K)};default:return{t:'bin',v:kmorph(G,g,K,'e')}}}
+function kEff(k){return k.op==='label'?(k.conn===8?[[1,1,1],[1,1,-1],[-1,-1,-1]]:[[-1,1,-1],[1,1,-1],[-1,-1,-1]]):k.K}
+const kCl=(v,a,b)=>Math.max(a,Math.min(b,v));
+// The grid a kernels session works on: W x H cells drawn C pixels wide. Kernel functions take it as
+// their first argument (and alias it locally as KW, KH, KC) instead of reading globals.
+function kGrid(k){return{W:k.W,H:k.H,C:Math.max(10,Math.min(40,Math.floor(480/Math.max(k.W,k.H))))}}
+function kimg(G,k){const{W:KW}=G;const g=kraster(G,k);for(const key in k.px){const[a,b]=key.split(',').map(Number);if(kIn(G,a,b))g[b*KW+a]=k.px[key]===1?1:0}return g}
+const kNum=s=>{s=String(s).trim();if(/^-\s*(inf|∞)/i.test(s))return -Infinity;if(/^\+?\s*(inf|∞)/i.test(s))return Infinity;return s===''||isNaN(+s)?0:+s};
+const kFmt=v=>v===Infinity?'∞':v===-Infinity?'-∞':String(+v.toFixed(2));
+const kSI=(G,st,x,y)=>(st.dy==='bt'?G.H-1-y:y)*G.W+(st.dx==='rl'?G.W-1-x:x);
+const kSP=(G,st,i)=>{const ty=(i/G.W)|0,tx=i%G.W;return[st.dx==='rl'?G.W-1-tx:tx,st.dy==='bt'?G.H-1-ty:ty]};
+function kwt(G,inp,st,lim){const{H:KH,W:KW}=G;const n=st.Wt.length,r=n>>1,mn=st.red!=='max',o=Float64Array.from(inp),src=st.seq?o:inp,N=KW*KH;if(lim==null)lim=N-1;
+ for(let t=0;t<=lim&&t<N;t++){const[x,y]=kSP(G,st,t);let best=null;
+  for(let j=0;j<n;j++)for(let i=0;i<n;i++){const w=st.Wt[j][i];if(w==null)continue;const xx=x+i-r,yy=y+j-r;if(!kIn(G,xx,yy))continue;const v=src[yy*KW+xx]+w;if(best===null||(mn?v<best:v>best))best=v}
+  if(best!==null)o[y*KW+x]=best}
+ return o}
+function kalg(G,src,A,K){
+ const S='AB()\u2296\u2295\u2218\u2022\u2229\u222a\u2212\u1d9c',tk=[...src.replace(/\s+/g,'')].map(c=>/[ab]/i.test(c)?c.toUpperCase():c);let p=0;
+ const E=m=>{throw new Error(m)};
+ const atom=()=>{const c=tk[p];if(c==='A'){p++;return{img:A}}if(c==='B'){p++;return{se:1}}if(c==='('){p++;const v=expr();if(tk[p]!==')')E('missing )');p++;return v}E(c?'unexpected '+c:'the expression ends too early')};
+ const post=()=>{let v=atom();while(tk[p]==='\u1d9c'){p++;if(!v.img)E('complement needs an image');v={img:v.img.map(x=>x?0:1)}}return v};
+ const mor=()=>{let v=post();while('\u2296\u2295\u2218\u2022'.includes(tk[p]||'#')){const o=tk[p++],r=post();if(!v.img)E('left of '+o+' must be an image');if(!r.se)E('right of '+o+' must be B');
+  v={img:o==='\u2296'?kmorph(G,v.img,K,'e'):o==='\u2295'?kmorph(G,v.img,K,'d'):o==='\u2218'?kmorph(G,kmorph(G,v.img,K,'e'),K,'d'):kmorph(G,kmorph(G,v.img,K,'d'),K,'e')}}return v};
+ const term=()=>{let v=mor();while(tk[p]==='\u2229'){p++;const r=mor();if(!v.img||!r.img)E('\u2229 needs two images');v={img:v.img.map((x,i)=>x&&r.img[i]?1:0)}}return v};
+ const expr=()=>{let v=term();while(tk[p]==='\u222a'||tk[p]==='\u2212'){const o=tk[p++],r=term();if(!v.img||!r.img)E(o+' needs two images');v={img:v.img.map((x,i)=>o==='\u222a'?(x||r.img[i]?1:0):(x&&!r.img[i]?1:0))}}return v};
+ try{for(const c of tk)if(!S.includes(c))E('unknown symbol '+c);if(!tk.length)E('type an expression');const v=expr();if(p<tk.length)E('unexpected '+tk[p]);if(!v.img)E('the result must be an image, not B');return{v:v.img}}catch(e){return{err:e.message}}}
+function klab(G,inp,st,lim){const{H:KH,W:KW}=G;const N=KW*KH,E=new Float64Array(N),T=[0],pre=st.conn===8?[[-1,0],[0,-1],[-1,-1],[1,-1]]:[[-1,0],[0,-1]],lm=lim==null?N-1:lim;let k=1;
+ for(let t=0;t<=lm&&t<N;t++){const x=t%KW,y=(t/KW)|0;if(!inp[t])continue;const P=[];
+  for(const[dx,dy]of pre){const xx=x+dx,yy=y+dy;if(kIn(G,xx,yy)&&inp[yy*KW+xx]&&E[yy*KW+xx])P.push(E[yy*KW+xx])}
+  if(!P.length){E[t]=k;T[k]=k;k++}
+  else{const e=Math.min(...P.map(l=>T[l]));E[t]=e;for(let mu of P){let g=0;while(T[mu]!==e&&g++<999){const m=T[mu];T[mu]=e;mu=m}}}}
+ return{E,T,k}}
+// Each op turns this step's input into {full, part, lim, tblOut, tblPart}.
+// full = whole result, part = result revealed so far (sequential ops), lim = last scanned index.
+const kBin=input=>Uint8Array.from(input,v=>v>0?1:0);
+const kFlat=(T,w)=>{const U=T.slice();for(let l=1;l<=w&&l<U.length;l++){let m=l,g=0;while(U[m]!==m&&g++<999)m=U[m];U[l]=m}return U};
+const kWithEdits=(st,T)=>{const ov=st.Tedit||{},U=T.slice();for(const l in ov)if(+l>=1&&+l<U.length)U[+l]=ov[l];return U};
+function otsuCalc(h){const N=h.reduce((a,b)=>a+b,0)||1,p=Array.from(h,v=>v/N);let mt=0;for(let i=0;i<256;i++)mt+=i*p[i];
+ const w0=[],m0=[],sb=[];let cw=0,cm=0,best=-1,bt=0;
+ for(let t=0;t<256;t++){cw+=p[t];cm+=t*p[t];w0[t]=cw;m0[t]=cw>0?cm/cw:0;const w1=1-cw,m1=w1>1e-12?(mt-cm)/w1:0;sb[t]=cw>1e-12&&w1>1e-12?cw*w1*(m0[t]-m1)**2:0;if(sb[t]>best){best=sb[t];bt=t}}
+ let vt=0;for(let i=0;i<256;i++)vt+=(i-mt)**2*p[i];
+ return{p,w0,m0,sb,bt,best,mt,vt}}
+function isodata(o){let t=Math.round(o.mt),it=0;const seen=[t];
+ while(it<100){const w=o.w0[t],m0=o.m0[t],m1=w<1-1e-12?(o.mt-w*m0)/(1-w):m0,nt=Math.round((m0+m1)/2);if(nt===t)break;t=nt;it++;seen.push(t)}
+ return{t,it,seen}}
+return{applyLut,bitLut,cdfOf,gv,hist,isodata,kalg,kBin,kbox,kcells,kCl,kEff,kFlat,kFmt,kGrid,khm,kimg,kIn,klab,kmorph,
+ kNum,kout,kraster,kSI,kSP,kWithEdits,kwt,lohi,lum,lumLut,lutOf,maskLut,meanOf,otsuCalc,toGray,TR};
+})();
+
+/* ==== 2. CORE: sessions, persistence, undo, tabs, theme, PDF helpers ================================== */
+const Core=(()=>{
+const{applyLut,hist,lutOf,toGray,TR}=Algos;
+
+// Tab registry. Each tab registers {render, paint, exportPdf?, thumb?, newSession?, noImages?}.
+const TABS={};
+function registerTab(name,hooks){TABS[name]=hooks}
+const $=id=>document.getElementById(id);
+// The "no image yet" placeholder shared by the image tabs. Returns true when it was shown (caller then stops rendering).
+// Clicking or pressing Enter/Space on it opens the file picker (listeners on #main, below).
+function emptyState(m,hint){if(App.cur&&!App.cur.empty)return false;
+ m.innerHTML=`<div class="empty" role="button" tabindex="0"><b>${App.cur?'This session is empty: paste, drop or open an image into it':'Paste an image to start a session'}</b>${hint}</div>`;return true}
+function compute(s){
+ if(s.empty)return;
+ s.nodes.forEach(n=>{
+  if(n.root){n.out=s.gray?toGray(s.rgba):s.rgba;n.h=hist(n.out);return}
+  const par=s.nodes.find(x=>x.id===n.parent);
+  n.inH=par.h;n.lut=lutOf(n);n.out=applyLut(par.out,n.lut);n.h=hist(n.out);
+ });
+}
+function paintImg(c,s,d){c.width=s.w;c.height=s.h;c.getContext('2d').putImageData(new ImageData(d,s.w,s.h),0,0)}
+// Histogram with an optional T(r) curve over it (square when a curve is drawn, short strip otherwise).
+// One painter, two palettes: the live page follows the theme; PDF figures use fixed print colors on white.
+const PRINT_PAL={bg:'#fff',bars:'#b4bac0',diag:'#999',curve:'#d4452b',frame:'#888'};
+function drawHist(c,h,lut,pal){
+ const W=256,H=lut?256:110;c.width=W;c.height=H;const x=c.getContext('2d');
+ if(pal.bg){x.fillStyle=pal.bg;x.fillRect(0,0,W,H)}else x.clearRect(0,0,W,H);
+ const mx=Math.sqrt(Math.max(...h)||1);x.fillStyle=pal.bars;
+ for(let i=0;i<256;i++){const bh=Math.sqrt(h[i])/mx*H*(lut?.9:.95);x.fillRect(i,H-bh,1,bh)}
+ if(lut){x.strokeStyle=pal.diag;x.setLineDash([3,3]);x.beginPath();x.moveTo(0,H);x.lineTo(W,0);x.stroke();x.setLineDash([]);
+  x.strokeStyle=pal.curve;x.lineWidth=2;x.beginPath();
+  for(let r=0;r<256;r++){const y=H-lut[r]/255*H;r?x.lineTo(r,y):x.moveTo(r,y)}x.stroke()}
+ if(pal.frame){x.strokeStyle=pal.frame;x.lineWidth=1;x.strokeRect(.5,.5,W-1,H-1)}
+ return c}
+function paintHist(c,h,lut){const st=getComputedStyle(document.documentElement);
+ return drawHist(c,h,lut,{bars:st.getPropertyValue('--hist'),diag:'#8886',curve:st.getPropertyValue('--curve')})}
+const printHist=(h,lut)=>drawHist(document.createElement('canvas'),h,lut,PRINT_PAL).toDataURL('image/png');
+function redraw(s){drawSide();TABS[App.tab].paint(s)}
+function update(s){compute(s);redraw(s);save()}
+function render(){TABS[App.tab].render()}
+function drawSide(){
+ const sd=$('side');sd.innerHTML='';
+ App.sessions.forEach((s,i)=>{
+  const b=document.createElement('div');b.className='thumb'+(s===App.cur?' on':'');b.tabIndex=0;b.title='Session '+(i+1);
+  const T=TABS[App.tab];if(T.thumb){const c=document.createElement('canvas');T.thumb(c,s);b.append(c)}else{if(!s.empty&&!s.nodes[0].out)compute(s);
+  if(s.empty){b.append(mk('span','emp','empty'))}else{const c=document.createElement('canvas');paintImg(c,s,s.nodes[0].out);b.append(c)}}
+  const x=document.createElement('button');x.className='x';x.textContent='×';x.title='Close session';
+  x.onclick=e=>{e.stopPropagation();App.sessions=App.sessions.filter(q=>q!==s);idbDel(s.pid);if(App.cur===s)App.cur=App.sessions[App.sessions.length-1]||null;sync()};
+  b.append(x);b.onclick=()=>{App.cur=s;sync()};
+  b.onkeydown=e=>{if(e.key==='Enter'){App.cur=s;sync()}};sd.append(b)});
+ const pl=mk('button','thumb add','+');pl.title='New empty session';pl.setAttribute('aria-label','New empty session');
+ pl.onclick=()=>{const T=TABS[App.tab],s=T.newSession?T.newSession():{pid:uid(),w:0,h:0,rgba:null,empty:true,gray:$('gray').checked,nodes:[{id:0,root:true}]};App.sessions.push(s);App.cur=s;sync()};sd.append(pl);
+}
+function sync(){save();$('pdf').disabled=!App.cur||App.cur.empty;if(App.cur)$('gray').checked=App.cur.gray;render();if(App.cur)update(App.cur);else drawSide()}
+async function addImage(blob){if(TABS[App.tab].noImages)return;
+ const bmp=await createImageBitmap(blob),k=Math.min(1,1200/Math.max(bmp.width,bmp.height));
+ const w=Math.round(bmp.width*k),h=Math.round(bmp.height*k),c=document.createElement('canvas');c.width=w;c.height=h;
+ const x=c.getContext('2d',{willReadFrequently:true});x.drawImage(bmp,0,0,w,h);
+ const rgba=x.getImageData(0,0,w,h).data;
+ if(App.cur&&App.cur.empty){Object.assign(App.cur,{w,h,rgba,empty:false,gray:$('gray').checked});keep(c,App.cur.pid);sync();return}
+ const s={pid:uid(),w,h,rgba,gray:$('gray').checked,nodes:[{id:0,root:true}]};
+ App.sessions.push(s);App.cur=s;keep(c,s.pid);sync();
+}
+document.addEventListener('paste',e=>{const it=[...(e.clipboardData?.items||[])].find(i=>i.type.startsWith('image/'));if(it){e.preventDefault();addImage(it.getAsFile())}});
+document.addEventListener('dragover',e=>e.preventDefault());
+document.addEventListener('drop',e=>{e.preventDefault();const f=[...e.dataTransfer.files].find(f=>f.type.startsWith('image/'));if(f)addImage(f)});
+$('pick').onclick=()=>$('file').click();
+$('file').onchange=e=>{if(e.target.files[0])addImage(e.target.files[0]);e.target.value=''};
+$('gray').onchange=e=>{if(App.cur){App.cur.gray=e.target.checked;render();update(App.cur)}};
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>App.cur&&redraw(App.cur));
+let dl=null;
+(async()=>{try{dl=await window.claude?.use('downloads')}catch(e){}$('pdf').hidden=!window.jspdf})();
+const clean=t=>t.replace('Δ','Delta').replace('γ','gamma').replace(/–/g,'-');
+function imgUrl(s,d){const t=document.createElement('canvas');paintImg(t,s,d);const c=document.createElement('canvas');c.width=s.w;c.height=s.h;
+ const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,s.w,s.h);x.drawImage(t,0,0);return c.toDataURL('image/jpeg',.92)}
+function exportPdf(){const f=TABS[App.tab].exportPdf;return f&&f()}
+const IC=p=>`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
+const SUN=IC('<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'),MOON=IC('<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>');
+let dark=matchMedia('(prefers-color-scheme: dark)').matches;
+function setTheme(d){dark=d;document.documentElement.setAttribute('data-theme',d?'dark':'light');$('theme').innerHTML=d?SUN:MOON;
+ try{localStorage.setItem('hl-theme',d?'dark':'light')}catch(e){}if(App.cur)redraw(App.cur)}
+$('theme').onclick=()=>setTheme(!dark);
+let sv=null;
+try{sv=localStorage.getItem('hl-theme')}catch(e){}
+setTheme(sv==='dark'||sv==='light'?sv==='dark':dark);
+$('pdf').onclick=exportPdf;
+const nodeName=n=>n.root?'Original':TR[n.type].n;
+function mk(tag,cls,html){const e=document.createElement(tag);if(cls)e.className=cls;if(html!=null)e.innerHTML=html;return e}
+// Shared PDF scaffolding for the image tabs: A4 portrait, 12 mm margins, a title + subtitle header,
+// page.need(h) starts a new page when h mm no longer fit, then save and report progress in the header status.
+async function exportSessionPdf(title,fileStem,build){
+ const s=App.cur,st=$('st');if(!s||s.empty||!window.jspdf)return;st.textContent='Building PDF…';
+ try{
+  const doc=new window.jspdf.jsPDF({unit:'mm',format:'a4'}),M=12;
+  const page={doc,M,y:M,
+   need(h){if(this.y+h>287){doc.addPage();this.y=M}},
+   header(sub){doc.setFontSize(15);doc.setTextColor(30);doc.text(title,M,this.y+5);doc.setFontSize(9);doc.setTextColor(110);doc.text(sub,M,this.y+11);this.y+=18}};
+  await build(page,s);
+  await savePdf(doc,`${fileStem}-session-${App.sessions.indexOf(s)+1}.pdf`);st.textContent='';
+ }catch(e){st.textContent=e&&e.code==='declined'?'':'Could not export the PDF.'}
+}
+async function savePdf(doc,name){
+ const blob=doc.output('blob');
+ if(dl){await dl.save({filename:name,data:blob});return}
+ const f=new File([blob],name,{type:'application/pdf'});
+ if(matchMedia('(pointer:coarse)').matches&&navigator.canShare&&navigator.canShare({files:[f]})){
+  try{await navigator.share({files:[f],title:name})}catch(e){if(e&&e.name!=='AbortError')throw e}
+  return}
+ const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.append(a);a.click();a.remove();
+ setTimeout(()=>URL.revokeObjectURL(a.href),5000);
+}
+document.querySelectorAll('.tabs button').forEach(bt=>bt.onclick=()=>{
+ ST[App.tab]={sessions:App.sessions,cur:App.cur};App.tab=bt.dataset.tab;({sessions:App.sessions,cur:App.cur}=ST[App.tab]);document.body.dataset.tab=App.tab;
+ document.querySelectorAll('.tabs button').forEach(x=>x.setAttribute('aria-selected',x===bt));
+ sync()});
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+let dbp=null,saveT=0;
+const db=()=>dbp||(dbp=new Promise((res,rej)=>{const r=indexedDB.open('hist-lab',1);r.onupgradeneeded=()=>r.result.createObjectStore('imgs');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)}));
+const idbOp=(mode,fn)=>db().then(d=>new Promise((res,rej)=>{const t=d.transaction('imgs',mode),q=fn(t.objectStore('imgs'));t.oncomplete=()=>res(q&&q.result);t.onerror=()=>rej(t.error)}));
+const idbPut=(k,v)=>idbOp('readwrite',o=>o.put(v,k));
+const idbGet=k=>idbOp('readonly',o=>o.get(k));
+const idbDel=k=>{if(k)idbOp('readwrite',o=>o.delete(k)).catch(()=>{})};
+const keep=(c,pid)=>c.toBlob(b=>{if(b)idbPut(pid,b).catch(()=>{})},'image/png');
+function save(){
+ clearTimeout(saveT);
+ saveT=setTimeout(()=>{hTick();
+  // the active tab's sessions live in sessions/cur; the others are parked in ST
+  try{const per=Object.fromEntries(Object.keys(ST).map(t=>[t,t===App.tab?ser(App.sessions,App.cur):ser(ST[t].sessions,ST[t].cur)]));
+   localStorage.setItem('hl-state',JSON.stringify({v:2,tab:App.tab,...per}))}catch(e){}},250)}
+const ST={hist:{sessions:[],cur:null},bits:{sessions:[],cur:null},kern:{sessions:[],cur:null},otsu:{sessions:[],cur:null}};
+const ser=(ss,c)=>({cur:c?c.pid:null,sessions:ss.map(s=>({pid:s.pid,w:s.w,h:s.h,empty:!!s.empty,k:s.k||null,ot:s.ot||null,gray:s.gray,
+  nodes:s.nodes.map(n=>({id:n.id,parent:n.parent,type:n.type,v:n.v,root:n.root})),
+  bits:s.bits?{src:s.bits.src,sel:[...s.bits.sel],norm:s.bits.norm}:null}))});
+async function loadTab(d){
+ const sessions=[];let mx=0;
+ if(!d||!Array.isArray(d.sessions))return{sessions,cur:null,mx};
+ for(const r of d.sessions){
+  const s={pid:r.pid,w:r.w,h:r.h,gray:r.gray,empty:!!r.empty,rgba:null,nodes:r.nodes||[],k:r.k||undefined,ot:r.ot||undefined};
+  if(r.bits)s.bits={src:r.bits.src,sel:new Set(r.bits.sel),norm:r.bits.norm};
+  r.nodes.forEach(n=>{mx=Math.max(mx,n.id)});
+  if(!s.empty&&!s.k){
+   try{const blob=await idbGet(s.pid);if(!blob)continue;const bmp=await createImageBitmap(blob);
+    const c=document.createElement('canvas');c.width=bmp.width;c.height=bmp.height;
+    const x=c.getContext('2d',{willReadFrequently:true});x.drawImage(bmp,0,0);
+    s.rgba=x.getImageData(0,0,c.width,c.height).data;s.w=c.width;s.h=c.height}catch(e){continue}
+  }
+  sessions.push(s);
+ }
+ return{sessions,cur:sessions.find(s=>s.pid===d.cur)||sessions[sessions.length-1]||null,mx};
+}
+async function restore(){
+ let raw=null;try{raw=JSON.parse(localStorage.getItem('hl-state'))}catch(e){}
+ if(!raw)return;
+ const h=await loadTab(raw.hist||(raw.sessions?raw:null)),b=await loadTab(raw.bits),kk=await loadTab(raw.kern),oo=await loadTab(raw.otsu);
+ ST.hist=h;ST.bits=b;ST.kern=kk;ST.otsu=oo;App.nid=Math.max(App.nid,h.mx+1,b.mx+1);
+ App.tab=['bits','kern','otsu'].includes(raw.tab)?raw.tab:'hist';document.body.dataset.tab=App.tab;
+ document.querySelectorAll('.tabs button').forEach(x=>x.setAttribute('aria-selected',x.dataset.tab===App.tab));
+ ({sessions:App.sessions,cur:App.cur}=ST[App.tab]);sync();
+ idbOp('readwrite',o=>o.getAllKeys()).then(ks=>ks.forEach(k=>{
+  if(![...App.sessions,...ST.hist.sessions,...ST.bits.sessions,...ST.kern.sessions,...ST.otsu.sessions].some(s=>s.pid===k))idbDel(k)})).catch(()=>{});
+}
+$('main').addEventListener('click',e=>{if(e.target.closest('.empty'))$('file').click()});
+$('main').addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.classList.contains('empty')){e.preventDefault();$('file').click()}});
+function hSnap(s){if(!s)return null;
+ return s.k?JSON.stringify({k:s.k},(key,val)=>(key==='done'||key==='sig'||key==='pos'||key==='placed'||key==='tw'||key==='tn')?undefined:val)
+  :JSON.stringify({ot:s.ot||null,gray:s.gray,nodes:s.nodes.map(n=>({id:n.id,parent:n.parent,type:n.type,v:n.v,root:n.root})),bits:s.bits?{src:s.bits.src,sel:[...s.bits.sel],norm:s.bits.norm}:null})}
+function hBtns(){const s=App.cur;$('undo').disabled=!(s&&s.hs&&s.hs.u.length);$('redo').disabled=!(s&&s.hs&&s.hs.r.length)}
+function hTick(){const s=App.cur;if(!s)return;const sn=hSnap(s);
+ if(!s.hs)s.hs={u:[],r:[],last:sn};
+ else if(sn!==s.hs.last){s.hs.u.push(s.hs.last);if(s.hs.u.length>100)s.hs.u.shift();s.hs.r=[];s.hs.last=sn}
+ hBtns()}
+function hApply(s,snap){const d=JSON.parse(snap);
+ if(s.k){const nk=d.k;(nk.steps||[]).forEach((st,i)=>{const o=s.k.steps&&s.k.steps[i];st.pos=o?o.pos:[0,0];st.placed=o?o.placed:false;st.done=[];st.sig=''});s.k=nk}
+ else{s.ot=d.ot||undefined;s.gray=d.gray;s.nodes=d.nodes;s.bits=d.bits?{src:d.bits.src,sel:new Set(d.bits.sel),norm:d.bits.norm}:undefined}
+ sync();s.hs.last=hSnap(s)}
+function hUndo(){hTick();const s=App.cur;if(!s||!s.hs||!s.hs.u.length)return;const p=s.hs.u.pop();s.hs.r.push(s.hs.last);hApply(s,p);hBtns()}
+function hRedo(){hTick();const s=App.cur;if(!s||!s.hs||!s.hs.r.length)return;const n=s.hs.r.pop();s.hs.u.push(s.hs.last);hApply(s,n);hBtns()}
+$('undo').innerHTML=IC(`<path d='M9 14L4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3'/>`);
+$('redo').innerHTML=IC(`<path d='M15 14l5-5-5-5M20 9H10a6 6 0 0 0 0 12h3'/>`);
+$('undo').onclick=hUndo;
+$('redo').onclick=hRedo;
+document.addEventListener('keydown',e=>{const t=e.target,txt=t.tagName==='TEXTAREA'||(t.tagName==='INPUT'&&!['range','checkbox','button'].includes(t.type));
+ if(txt||!(e.ctrlKey||e.metaKey))return;const k=e.key.toLowerCase();
+ if(k==='z'&&!e.shiftKey){e.preventDefault();hUndo()}else if(k==='y'||(k==='z'&&e.shiftKey)){e.preventDefault();hRedo()}});
+document.addEventListener('click',()=>document.querySelectorAll('.menu').forEach(z=>z.hidden=true));
+return{$,addImage,clean,drawSide,emptyState,exportSessionPdf,IC,imgUrl,mk,nodeName,paintHist,paintImg,printHist,registerTab,
+ render,restore,save,sync,uid,update};
+})();
+
+/* ==== 3. TAB: Histogram transforms ==================================================================== */
+const HistTab=(()=>{
+const{applyLut,gv,lutOf,TR}=Algos;
+const{$,clean,emptyState,exportSessionPdf,imgUrl,paintHist,paintImg,printHist,registerTab,render,update}=Core;
+
+function paintHistTab(s){
+ s.nodes.forEach(n=>{
+  if(!n.el)return;paintImg(n.el.img,s,n.out);paintHist(n.el.oh,n.h,null);
+  if(!n.root)paintHist(n.el.curve,n.inH,n.lut);
+ });
+}
+function nodeCard(s,n,depth){
+ const t=n.root?null:TR[n.type];
+ const card=document.createElement('section');card.className='card';card.style.marginLeft=Math.min(depth,6)*18+'px';
+ const par=n.root?'':` <span class="mut">from #${n.parent}</span>`;
+ card.innerHTML=`<h2>#${n.id} ${n.root?(s.gray?'Original (grayscale)':'Original (color)'):t.n}${par}<span class="sp"></span>${n.root?'':'<button data-del>Remove</button>'}</h2><div class="row"></div>`;
+ const row=card.querySelector('.row'),el={};n.el=el;
+ if(!n.root){
+  const c=document.createElement('div');c.className='col';c.style.width='280px';
+  el.curve=document.createElement('canvas');el.curve.className='v';c.append(el.curve);
+  const cap=document.createElement('div');cap.className='cap';cap.textContent='Input histogram (sqrt scale) with T(r) curve';c.append(cap);
+  t.p.forEach(([k,lab,mn,mx,stp,,lg,opts])=>{
+   const d=document.createElement('div');d.className='ctl';
+   if(lg==='sel'){d.innerHTML=`<span>${lab}</span><select style="grid-column:2/4">${opts.map((o,i)=>`<option value="${i}">${o}</option>`).join('')}</select>`;
+    const se=d.querySelector('select');se.value=n.v[k];se.onchange=()=>{n.v[k]=+se.value;update(s)};c.append(d);return}
+   d.innerHTML=`<span>${lab}</span><input type="range" min="${mn}" max="${mx}" step="${stp}" value="${n.v[k]}"><output></output>`;
+   const inp=d.querySelector('input'),o=d.querySelector('output');
+   const show=()=>o.textContent=lg==='log'?gv(+inp.value).toFixed(2):inp.value;show();
+   inp.oninput=()=>{n.v[k]=+inp.value;show();update(s)};c.append(d)});
+  row.append(c);
+ }
+ const ic=document.createElement('div');ic.className='col';
+ el.img=document.createElement('canvas');el.img.className='v img';ic.append(el.img);row.append(ic);
+ const hc=document.createElement('div');hc.className='col';hc.style.width='256px';
+ el.oh=document.createElement('canvas');el.oh.className='v';hc.append(el.oh);
+ const hcap=document.createElement('div');hcap.className='cap';hcap.textContent=n.root?'Histogram':'Resulting histogram';hc.append(hcap);row.append(hc);
+ const sel=document.createElement('button');sel.className='add';sel.textContent='Apply transform ▾';
+ sel.onclick=()=>openPicker(s,n,card);
+ card.append(sel);
+ const del=card.querySelector('[data-del]');
+ if(del)del.onclick=()=>{const rm=new Set([n.id]);let ch=true;while(ch){ch=false;s.nodes.forEach(x=>{if(!rm.has(x.id)&&rm.has(x.parent)){rm.add(x.id);ch=true}})}
+  s.nodes=s.nodes.filter(x=>!rm.has(x.id));render();update(s)};
+ return card;
+}
+function openPicker(s,n,card){
+ let p=card.querySelector('.picker');if(p){p.remove();return}
+ p=document.createElement('div');p.className='picker';
+ const sc=document.createElement('canvas');paintImg(sc,s,n.out);
+ const k=Math.min(1,96/Math.max(s.w,s.h)),tw=Math.max(1,Math.round(s.w*k)),th=Math.max(1,Math.round(s.h*k));
+ const tc=document.createElement('canvas');tc.width=tw;tc.height=th;const tx=tc.getContext('2d',{willReadFrequently:true});
+ tx.drawImage(sc,0,0,tw,th);const sd=tx.getImageData(0,0,tw,th).data;
+ Object.entries(TR).forEach(([type,t])=>{
+  const v={};t.p.forEach(q=>v[q[0]]=q[5]);const lut=lutOf({type,v,inH:n.h});
+  const b=document.createElement('button');b.className='tile';b.title='Add '+t.n;
+  const cv=document.createElement('canvas');cv.className='c';paintHist(cv,n.h,lut);
+  const im=document.createElement('canvas');im.className='r';im.width=tw;im.height=th;
+  im.getContext('2d').putImageData(new ImageData(applyLut(sd,lut),tw,th),0,0);
+  const lb=document.createElement('span');lb.textContent=t.n;b.append(cv,im,lb);
+  b.onclick=()=>{s.nodes.push({id:App.nid++,parent:n.id,type,v});render();update(s);
+   s.nodes[s.nodes.length-1].el.img.scrollIntoView({block:'nearest',behavior:'smooth'})};
+  p.append(b)});
+ card.append(p);
+}
+function renderHist(){
+ const m=$('main');m.innerHTML='';
+ if(emptyState(m,'Click to choose a file, or press Ctrl/Cmd+V anywhere on this page, drop a file, or use “Open image…”.<br>Each new image opens its own session.'))return;
+ const depth=id=>{const n=App.cur.nodes.find(x=>x.id===id);return n.root?0:1+depth(n.parent)};
+ // depth-first order so children sit under parents
+ const order=[],walk=id=>{order.push(App.cur.nodes.find(x=>x.id===id));App.cur.nodes.filter(x=>x.parent===id).forEach(c=>walk(c.id))};walk(0);
+ order.forEach(n=>m.append(nodeCard(App.cur,n,depth(n.id))));
+}
+function pstr(n){return TR[n.type].p.map(([k,l,,,,,lg,o])=>clean(l)+'='+(lg==='sel'?o[n.v[k]]:lg==='log'?gv(n.v[k]).toFixed(2):n.v[k])).join(', ')}
+function exportHistPdf(){return exportSessionPdf('Histogram transform lab','histogram',(P,s)=>{const{doc,M}=P,BH=70;
+ P.header(`Session ${App.sessions.indexOf(s)+1}: ${s.w} x ${s.h} px, ${s.gray?'grayscale (RGB to gray)':'color'}, ${new Date().toLocaleDateString()}`);
+ const order=[],walk=id=>{order.push(s.nodes.find(x=>x.id===id));s.nodes.filter(x=>x.parent===id).forEach(c=>walk(c.id))};walk(0);
+ for(const n of order){
+  P.need(BH);const y=P.y;
+  const name=n.root?'Original':clean(TR[n.type].n);
+  doc.setFontSize(10);doc.setTextColor(30);doc.text(`#${n.id} ${name}${n.root?'':' (from #'+n.parent+')'}`,M,y+4);
+  if(!n.root){doc.setFontSize(8);doc.setTextColor(110);doc.text(pstr(n),M,y+9)}
+  let x=M;const ty=y+12;doc.setFontSize(7);doc.setTextColor(120);
+  if(!n.root){doc.addImage(printHist(n.inH,n.lut),'PNG',x,ty,52,52);doc.text('Input histogram + T(r)',x,ty+55);x+=56}
+  const k=Math.min(70/s.w,52/s.h),iw=s.w*k,ih=s.h*k;
+  doc.addImage(imgUrl(s,n.out),'JPEG',x,ty,iw,ih);x+=74;
+  doc.addImage(printHist(n.h,null),'PNG',x,ty,52,52*110/256);doc.text('Resulting histogram',x,ty+52*110/256+3);
+  P.y+=BH;
+ }})}
+const hooks={render:renderHist,paint:paintHistTab,exportPdf:exportHistPdf};
+registerTab('hist',hooks);
+return hooks;
+})();
+
+/* ==== 4. TAB: Bit-plane slicing ======================================================================= */
+const BitsTab=(()=>{
+const{bitLut,lumLut,maskLut}=Algos;
+const{$,clean,emptyState,exportSessionPdf,imgUrl,mk,nodeName,paintHist,paintImg,printHist,registerTab,save}=Core;
+
+let bitsEl=null;
+function bitsState(){const s=App.cur;if(!s.bits)s.bits={src:0,sel:new Set([8,7]),norm:true};if(!s.nodes.some(n=>n.id===s.bits.src))s.bits.src=0;return s.bits}
+function tog(k){const x=App.cur.bits.sel;x.has(k)?x.delete(k):x.add(k);paintBits()}
+function renderBits(){
+ const m=$('main');m.innerHTML='';bitsEl=null;
+ if(emptyState(m,'Click to choose a file (or paste one), then slice it into bit planes here.'))return;
+ const s=App.cur,b=bitsState(),E=bitsEl={planes:{},chips:{}};
+ const c1=mk('section','card','<h2>Source and group</h2>'),r1=mk('div','row');
+ const sc=mk('div','col');sc.style.minWidth='220px';if(s.nodes.length>1)sc.append(mk('label','cap','Slice this image'));
+ const sel=mk('select');sel.innerHTML=s.nodes.map(n=>`<option value='${n.id}'>#${n.id} ${nodeName(n)}</option>`).join('');sel.value=b.src;
+ sel.onchange=()=>{b.src=+sel.value;paintBits()};if(s.nodes.length>1)sc.append(sel);
+ const nl=mk('label','sw',"<input type='checkbox'> Rescale group to full range");nl.firstChild.checked=b.norm;
+ nl.firstChild.onchange=e=>{b.norm=e.target.checked;paintBits()};sc.append(nl);
+ const gc=mk('div','col');gc.append(mk('div','cap','Group planes (8 = MSB, 1 = LSB)'));
+ const chips=mk('div','chips');
+ for(let k=8;k>=1;k--){const ch=mk('button','chip',k);ch.onclick=()=>tog(k);E.chips[k]=ch;chips.append(ch)}
+ const pre=mk('div','chips');
+ [['MSB only',[8]],['8 + 7',[8,7]],['8 to 6',[8,7,6]],['8 to 5',[8,7,6,5]],['All',[1,2,3,4,5,6,7,8]],['Clear',[]]].forEach(([l,a])=>{const x=mk('button','',l);x.onclick=()=>{b.sel=new Set(a);paintBits()};pre.append(x)});
+ gc.append(chips,pre);r1.append(sc,gc);c1.append(r1);
+ const gr=mk('div','row');gr.style.marginTop='12px';
+ const gi=mk('div','col');E.gimg=mk('canvas','v img');gi.append(E.gimg);
+ const gv2=mk('div','col');gv2.style.width='240px';E.gcurve=mk('canvas','v');E.gtxt=mk('div','cap');gv2.append(E.gcurve,E.gtxt);
+ gr.append(gi,gv2);c1.append(gr);m.append(c1);
+ const g=mk('div','bgrid');
+ const tile=k=>{
+  const t=mk('section','card');
+  const h=mk('h2','',k?`Bit plane ${k}${k===8?' (MSB)':k===1?' (LSB)':''}`:'Source image');
+  const P=E.planes[k]={};
+  if(k){h.append(mk('span','sp'));const lb=mk('label','sw',"<input type='checkbox'> <span class='cap'>In group</span>");lb.firstChild.onchange=()=>tog(k);P.cb=lb.firstChild;h.append(lb)}
+  const r=mk('div','row2');P.img=mk('canvas','v img');P.curve=mk('canvas','v');r.append(P.img,P.curve);t.append(h,r);
+  t.append(mk('div','cap',k?`T(r) = 255 when bit ${k} of r is 1, else 0 (period ${2**k} levels)`:'T(r) = r (identity)'));g.append(t)};
+ [0,1,2,3,4,5,6,7,8].forEach(tile);m.append(g);
+}
+function paintBits(){
+ const s=App.cur,E=bitsEl;if(!s||!E||App.tab!=='bits')return;save();
+ const b=bitsState(),n=s.nodes.find(x=>x.id===b.src),idl=new Uint8Array(256).map((_,i)=>i);
+ paintImg(E.planes[0].img,s,n.out);paintHist(E.planes[0].curve,n.h,idl);
+ for(let k=1;k<=8;k++){const l=bitLut(k),p=E.planes[k];paintImg(p.img,s,lumLut(n.out,l));paintHist(p.curve,n.h,l);
+  p.cb.checked=b.sel.has(k);E.chips[k].setAttribute('aria-pressed',b.sel.has(k))}
+ let m=0;b.sel.forEach(k=>m|=1<<(k-1));const gl=maskLut(m,b.norm);
+ paintImg(E.gimg,s,lumLut(n.out,gl));paintHist(E.gcurve,n.h,gl);
+ const ks=[...b.sel].sort((a,c)=>c-a);
+ E.gtxt.textContent=m?`Planes ${ks.join(' + ')}: T(r) = r AND ${m} (${m.toString(2).padStart(8,'0')})${b.norm?', rescaled by 255/'+m:''}`:'Select at least one plane to see the group result.';
+}
+function exportBitsPdf(){return exportSessionPdf('Bit-plane slicing','bitplanes',(P,s)=>{const{doc,M}=P,RH=60;
+ const b=bitsState(),n=s.nodes.find(x=>x.id===b.src),idl=new Uint8Array(256).map((_,i)=>i);
+ P.header(`Session ${App.sessions.indexOf(s)+1}, source #${n.id} ${clean(nodeName(n))}, ${s.w} x ${s.h} px, ${new Date().toLocaleDateString()}`);
+ const k=Math.min(44/s.w,44/s.h),iw=s.w*k,ih=s.h*k;
+ const tile=(x,y,title,cap,d,lut)=>{doc.setFontSize(10);doc.setTextColor(30);doc.text(title,x,y+4);
+  doc.addImage(imgUrl(s,d),'JPEG',x,y+7,iw,ih);doc.addImage(printHist(n.h,lut),'PNG',x+46,y+7,44,44);
+  doc.setFontSize(7);doc.setTextColor(120);doc.text(doc.splitTextToSize(cap,90),x,y+55)};
+ const items=[['Source image','T(r) = r (identity)',n.out,idl]];
+ for(let p=1;p<=8;p++){const l=bitLut(p);items.push([`Bit plane ${p}${p===8?' (MSB)':p===1?' (LSB)':''}`,`T(r) = 255 if bit ${p} of r is 1, else 0 (period ${2**p} levels)`,lumLut(n.out,l),l])}
+ // two tiles per row
+ items.forEach((it,i)=>{const col=i%2;if(!col){if(i)P.y+=RH;P.need(RH)}tile(M+col*94,P.y,...it)});
+ P.y+=RH;P.need(RH);
+ let m=0;b.sel.forEach(q=>m|=1<<(q-1));
+ if(m){const gl=maskLut(m,b.norm),ks=[...b.sel].sort((a,c)=>c-a);
+  tile(M,P.y,'Group: planes '+ks.join(' + '),`T(r) = r AND ${m} (${m.toString(2).padStart(8,'0')})${b.norm?', rescaled by 255/'+m:', not rescaled'}`,lumLut(n.out,gl),gl)}
+ else{doc.setFontSize(9);doc.setTextColor(110);doc.text('No bit planes selected for grouping.',M,P.y+4)}})}
+const hooks={render:renderBits,paint:()=>paintBits(),exportPdf:exportBitsPdf};
+registerTab('bits',hooks);
+return hooks;
+})();
+
+/* ==== 5. TAB: Kernels & morphology ==================================================================== */
+const KernTab=(()=>{
+const{kalg,kBin,kbox,kcells,kCl,kEff,kFlat,kFmt,kGrid,kimg,kIn,klab,kNum,kout,kraster,kSI,kSP,kWithEdits,kwt}=Algos;
+const{$,drawSide,IC,mk,registerTab,save,uid}=Core;
+
+const KP=[['4-conn cross',[[-1,1,-1],[1,1,1],[-1,1,-1]]],['8-conn square',[[1,1,1],[1,1,1],[1,1,1]]],['Horizontal',[[-1,-1,-1],[1,1,1],[-1,-1,-1]]],['Vertical',[[-1,1,-1],[-1,1,-1],[-1,1,-1]]],['Corner NW',[[0,0,-1],[0,1,1],[-1,1,-1]]],['Corner SE',[[-1,1,-1],[1,1,0],[-1,0,0]]]];
+const KOPS=[['erode','Erosion'],['dilate','Dilation'],['hm','Hit-or-miss'],['alg','Algebra'],['wt','Weighted min/max-plus (sequential)'],['label','Sequential labeling'],['apply','Relabel through table']];
+let kE=null;
+// transient kernels-tab UI state (never saved): active step, selected shapes, shape being drawn, whether a drag is in progress
+const kui={act:0,sel:new Set(),draft:null,dragging:false};
+function newKern(){return{pid:uid(),w:0,h:0,rgba:null,gray:true,nodes:[],k:{shapes:[],nx:1,ng:1,view:'drawing',op:'erode',conn:8,tool:'rect',fill:true,K:KP[1][1].map(r=>r.slice()),pos:[0,0]}}}
+function kCell(G,x,i,fill,txt,tc){const{C:KC,W:KW}=G;const X=(i%KW)*KC,Y=((i/KW)|0)*KC;x.fillStyle=fill;x.fillRect(X,Y,KC,KC);x.strokeStyle='#cfcfcf';x.lineWidth=1;x.strokeRect(X+.5,Y+.5,KC-1,KC-1);
+ if(txt!==''){x.fillStyle=tc;x.fillText(txt,X+KC/2,Y+KC/2+1)}}
+function kDraw(G,x,sh){const{C:KC}=G;const hue=sh.id*57%360;x.fillStyle=`hsl(${hue},60%,75%)`;x.strokeStyle=`hsl(${hue},50%,35%)`;x.lineWidth=2;x.lineCap=x.lineJoin='round';
+ if(sh.t==='free'){x.beginPath();sh.pts.forEach((p,i)=>x[i?'lineTo':'moveTo']((p[0]+.5)*KC,(p[1]+.5)*KC));if(sh.pts.length===1)x.lineTo((sh.pts[0][0]+.5)*KC+.1,(sh.pts[0][1]+.5)*KC);x.lineWidth=KC*.7;x.strokeStyle=`hsl(${hue},50%,45%)`;x.stroke();return}
+ const[a,b,c,d]=kbox(sh),X=a*KC,Y=b*KC,w=(c-a+1)*KC,h=(d-b+1)*KC;x.beginPath();
+ if(sh.t==='rect')x.rect(X,Y,w,h);else if(sh.t==='ellipse')x.ellipse(X+w/2,Y+h/2,w/2,h/2,0,0,7);
+ else{x.moveTo(X+w/2,Y);x.lineTo(X+w,Y+h/2);x.lineTo(X+w/2,Y+h);x.lineTo(X,Y+h/2);x.closePath()}
+ if(sh.fill)x.fill();x.stroke()}
+function kSelBox(G,x,k,acc){const{C:KC}=G;x.save();x.strokeStyle=acc;x.lineWidth=2;const gs=new Set();
+ k.shapes.forEach(sh=>{if(!kui.sel.has(sh.id))return;x.setLineDash([4,3]);const b=kbox(sh);x.strokeRect(b[0]*KC-1,b[1]*KC-1,(b[2]-b[0]+1)*KC+2,(b[3]-b[1]+1)*KC+2);if(sh.g)gs.add(sh.g)});
+ gs.forEach(id=>{const bs=k.shapes.filter(s=>s.g===id).map(kbox),a=Math.min(...bs.map(b=>b[0])),b=Math.min(...bs.map(q=>q[1])),c=Math.max(...bs.map(q=>q[2])),d=Math.max(...bs.map(q=>q[3]));
+  x.setLineDash([10,4]);x.strokeRect(a*KC-4,b*KC-4,(c-a+1)*KC+8,(d-b+1)*KC+8)});x.restore()}
+function kKernel(G,x,k,acc,crv){const{C:KC}=G;const K=k.K,n=K.length,r=n>>1,[px,py]=k.pos;x.save();x.lineWidth=2;
+ for(let j=0;j<n;j++)for(let i=0;i<n;i++){const v=K[j][i],X=(px+i-r)*KC,Y=(py+j-r)*KC;
+  if(v<0){x.setLineDash([3,3]);x.strokeStyle='#888';x.strokeRect(X+1,Y+1,KC-2,KC-2);continue}
+  x.setLineDash([]);x.fillStyle=(v?acc:crv)+'66';x.fillRect(X,Y,KC,KC);x.strokeStyle=v?acc:crv;x.strokeRect(X+1,Y+1,KC-2,KC-2);x.fillStyle='#000';x.fillText(v,X+KC/2,Y+KC/2+1)}
+ x.setLineDash([]);x.lineWidth=2;x.strokeStyle='#000';x.strokeRect((px-r)*KC,(py-r)*KC,n*KC,n*KC);x.lineWidth=3;x.strokeStyle='#000';x.strokeRect(px*KC+2,py*KC+2,KC-4,KC-4);x.restore()}
+const KI={select:`<path d='M5 3l14 7-6 2-2 6z'/>`,rect:`<rect x='4' y='6' width='16' height='12'/>`,ellipse:`<ellipse cx='12' cy='12' rx='8' ry='6'/>`,diamond:`<path d='M12 3l9 9-9 9-9-9z'/>`,free:`<path d='M3 17c3-8 5-8 8-2s5 4 10-8'/>`,
+ group:`<rect x='3' y='3' width='11' height='11' stroke-dasharray='2 2'/><rect x='10' y='10' width='11' height='11'/>`,ungroup:`<rect x='3' y='3' width='8' height='8'/><rect x='13' y='13' width='8' height='8'/>`,del:`<path d='M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13'/>`};
+const KT=[['select','Select / move','V',KI.select],['rect','Rectangle','R',KI.rect],['ellipse','Ellipse','O',KI.ellipse],['diamond','Diamond','D',KI.diamond],['free','Line (freehand)','L',KI.free]];
+function kGroup(){const k=App.cur.k,sel=k.shapes.filter(q=>kui.sel.has(q.id));if(sel.length>1){const id=k.ng++;sel.forEach(q=>q.g=id)}}
+function kUngroup(){App.cur.k.shapes.forEach(q=>{if(kui.sel.has(q.id))q.g=0})}
+function kDelete(){const k=App.cur.k;k.shapes=k.shapes.filter(q=>!kui.sel.has(q.id));kui.sel.clear()}
+const KCUR={};
+function kCur(t){if(KCUR[t])return KCUR[t];
+ const st="fill='none' stroke='black' stroke-width='1.5'",
+  g={rect:`<rect x='13' y='14' width='10' height='7' ${st}/>`,ellipse:`<ellipse cx='18' cy='17.5' rx='5' ry='4' ${st}/>`,diamond:`<path d='M18 12l5 5.5-5 5.5-5-5.5z' ${st}/>`,free:`<path d='M12 22c2-7 3 2 5-3s3 0 5-4' ${st}/>`}[t]||'',
+  svg=`<svg xmlns='http://www.w3.org/2000/svg' width='26' height='26'><path d='M7 1v12M1 7h12' stroke='white' stroke-width='3.2'/><path d='M7 1v12M1 7h12' stroke='black' stroke-width='1.2'/>${g}</svg>`;
+ return KCUR[t]=`url("data:image/svg+xml,${encodeURIComponent(svg)}") 7 7, crosshair`}
+document.addEventListener('keydown',e=>{if(App.tab!=='kern'||!App.cur||!App.cur.k||/INPUT|SELECT|TEXTAREA/.test(e.target.tagName))return;
+ const d={ArrowRight:'r',ArrowLeft:'l',ArrowUp:'u',ArrowDown:'d'}[e.key];if(d){e.preventDefault();kMove(d);return}
+ if(e.ctrlKey||e.metaKey||e.altKey)return;
+ const T={v:'select',r:'rect',o:'ellipse',d:'diamond',l:'free',p:'paint'}[e.key.toLowerCase()];
+ if(T&&!e.shiftKey){App.cur.k.tool=T;App.cur.k.view='drawing';kPaint();return}
+ if(e.key==='g'){kGroup();kPaint()}else if(e.key==='G'){kUngroup();kPaint()}else if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();kDelete();kPaint()}});
+KI.paint=`<rect x='4' y='4' width='7' height='7' fill='currentColor'/><rect x='13' y='13' width='7' height='7'/><path d='M13 4h7v7h-7z' stroke-dasharray='2 2'/>`;
+function kMig(k){if(!k.W){k.W=12;k.H=12}if(!k.px)k.px={};
+ if(!k.steps)k.steps=[{op:k.op||'erode',conn:k.conn||8,K:k.K||KP[1][1].map(r=>r.slice()),pos:k.pos||[0,0],placed:!!k.placed,done:[],sig:''}];
+ }
+function kPx(G,k,p,er){const{W:KW}=G;const key=p[0]+','+p[1];if(!er)k.px[key]=1;else if(kraster(G,k)[p[1]*KW+p[0]])k.px[key]=-1;else delete k.px[key]}
+function kThumb(c,s){kMig(s.k);const G=kGrid(s.k);c.width=G.W;c.height=G.H;const g=kimg(G,s.k),d=new Uint8ClampedArray(g.length*4);
+ for(let i=0;i<g.length;i++){const v=g[i]?30:250;d[i*4]=d[i*4+1]=d[i*4+2]=v;d[i*4+3]=255}
+ c.getContext('2d').putImageData(new ImageData(d,G.W,G.H),0,0)}
+function renderKern(){
+ const m=$('main');m.innerHTML='';kE=null;kui.sel.clear();
+ if(!App.cur){App.cur=newKern();App.sessions.push(App.cur)}
+ const k=App.cur.k;kMig(k);const E=kE={steps:[]};
+ const c1=mk('section','card');c1.append(mk('h2','','Drawing tools'));
+ const r1=mk('div','row'),tl=mk('div','chips');E.tools={};
+ [...KT,['paint','Paint 1s (Shift or right-drag erases)','P',KI.paint]].forEach(([t,l,key,ic])=>{const b=mk('button','chip ibtn',IC(ic));b.title=`${l} (${key})`;b.setAttribute('aria-label',l);b.onclick=()=>{k.tool=t;if(t!=='paint')k.view='drawing';kPaint()};E.tools[t]=b;tl.append(b)});
+ const fl=mk('label','sw',"<input type='checkbox'> Fill shapes");E.fill=fl.firstChild;
+ E.fill.onchange=e=>{k.fill=e.target.checked;k.shapes.forEach(sh=>{if(kui.sel.has(sh.id)&&sh.t!=='free')sh.fill=k.fill});kPaint()};
+ const gz=mk('label','sw',"Grid <input type='number' min='4' max='32'> x <input type='number' min='4' max='32'>"),gi=gz.querySelectorAll('input');E.gw=gi[0];E.gh=gi[1];
+ E.gw.onchange=E.gh.onchange=()=>{k.W=kCl(+E.gw.value||12,4,32);k.H=kCl(+E.gh.value||12,4,32);kPaint()};
+ const act=(l,f)=>{const b=mk('button','',l);b.onclick=()=>{f();kPaint()};return b},ac=mk('div','chips');
+ const ia=(l,key,ic,f)=>{const b=mk('button','ibtn',IC(ic));b.title=`${l} (${key})`;b.setAttribute('aria-label',l);b.onclick=()=>{f();kPaint()};return b};
+ ac.append(ia('Group','G',KI.group,kGroup),ia('Ungroup','Shift+G',KI.ungroup,kUngroup),ia('Delete','Del',KI.del,kDelete),act('Clear all',()=>{k.shapes=[];k.px={};kui.sel.clear()}));
+ r1.append(tl,fl,gz,ac);c1.append(r1);m.append(c1);
+ k.steps.forEach((st,i)=>m.append(kStepCard(E,k,st,i)));
+ kui.act=Math.min(kui.act,k.steps.length-1);
+}
+function kSvg(K,c,dig){const n=K.length,r=n>>1;let s=`<svg width='${n*c}' height='${n*c}' viewBox='0 0 ${n*c} ${n*c}' style='display:block'>`;
+ K.forEach((row,j)=>row.forEach((v,i)=>{const x=i*c,y=j*c,a=`x='${x+1}' y='${y+1}' width='${c-2}' height='${c-2}' data-i='${i}' data-j='${j}' pointer-events='all'`;
+  s+=v<0?`<rect ${a} fill='none' stroke='var(--mut)' stroke-dasharray='2 2'/>`:`<rect ${a} rx='2' fill='${v?'var(--acc)':'var(--curve)'}'/>`;
+  if(dig&&v>=0)s+=`<text x='${x+c/2}' y='${y+c/2+1}' text-anchor='middle' dominant-baseline='middle' font-size='${c*.45}' font-family='monospace' font-weight='600' fill='var(--bg)' pointer-events='none'>${v}</text>`}));
+ return s+`<rect x='${r*c+3}' y='${r*c+3}' width='${c-6}' height='${c-6}' fill='none' stroke='var(--ink)' stroke-width='2' pointer-events='none'/></svg>`}
+function kEd(E,k){const hm=k.op==='hm',V=hm?k.K:k.K.map(r=>r.map(v=>v===0?-1:v));E.ked.innerHTML=kSvg(V,32,true);
+ E.ked.querySelectorAll('rect[data-i]').forEach(r=>r.onclick=()=>{const i=+r.dataset.i,j=+r.dataset.j,v=V[j][i];k.K[j][i]=hm?(v===1?0:v===0?-1:1):(v===1?-1:1);kEd(E,k);kPaint()})}
+function kFixWt(st){if(!st.Wt)st.Wt=[[null,1,null],[1,0,null],[null,null,null]];if(!st.red)st.red='min';if(st.seq==null)st.seq=true;if(!st.dx)st.dx='lr';if(!st.dy)st.dy='tb'}
+const KPW=[['V4 forward',[[null,1,null],[1,0,null],[null,null,null]],'lr','tb'],['V4 backward',[[null,null,null],[null,0,1],[null,1,null]],'rl','bt'],['V8 forward',[[1,1,1],[1,0,null],[null,null,null]],'lr','tb'],['V8 backward',[[null,null,null],[null,0,1],[1,1,1]],'rl','bt']];
+function kNumCell(G,x,j,v,mx){const fin=isFinite(v);kCell(G,x,j,v===0?'#fff':!fin?'#cfd8e3':`hsl(195,65%,${88-48*Math.max(0,Math.min(v/mx,1))}%)`,kFmt(v),'#123')}
+function kDrawVals(G,x,vals,mut,nums){const bin=vals.every(v=>v===0||v===1);let mx=1;if(!bin)vals.forEach(v=>{if(isFinite(v)&&v>mx)mx=v});
+ for(let j=0;j<vals.length;j++){const v=vals[j];x.globalAlpha=mut&&mut(j)?.4:1;
+  if(bin)kCell(G,x,j,v?'#222':'#fff',nums?v:'',v?'#fff':'#999');else kNumCell(G,x,j,v,mx)}
+ x.globalAlpha=1}
+function kKernelW(G,x,st,acc){const{C:KC}=G;const n=st.Wt.length,r=n>>1,[px,py]=st.pos,cs=kSI(G,st,px,py);x.save();x.lineWidth=2;
+ for(let j=0;j<n;j++)for(let i=0;i<n;i++){const w=st.Wt[j][i],xx=px+i-r,yy=py+j-r,X=xx*KC,Y=yy*KC;
+  if(w==null){x.setLineDash([3,3]);x.strokeStyle='#888';x.strokeRect(X+1,Y+1,KC-2,KC-2);x.fillStyle='#888';x.fillText('∞',X+KC/2,Y+KC/2+1);continue}
+  const upd=st.seq&&kIn(G,xx,yy)&&kSI(G,st,xx,yy)<cs;x.setLineDash([]);x.fillStyle=upd?acc+'88':'#9993';x.fillRect(X,Y,KC,KC);x.strokeStyle=upd?acc:'#777';x.strokeRect(X+1,Y+1,KC-2,KC-2);x.fillStyle='#000';x.fillText(kFmt(w),X+KC/2,Y+KC/2+1)}
+ x.setLineDash([]);x.strokeStyle='#000';x.lineWidth=2;x.strokeRect((px-r)*KC,(py-r)*KC,n*KC,n*KC);x.lineWidth=3;x.strokeRect(px*KC+2,py*KC+2,KC-4,KC-4);x.restore()}
+function kSvgW(Wt,c){const n=Wt.length,r=n>>1;let s=`<svg width='${n*c}' height='${n*c}' viewBox='0 0 ${n*c} ${n*c}' style='display:block'>`;
+ Wt.forEach((row,j)=>row.forEach((w,i)=>{const x=i*c,y=j*c,a=`x='${x+1}' y='${y+1}' width='${c-2}' height='${c-2}'`,t=`x='${x+c/2}' y='${y+c/2+1}' text-anchor='middle' dominant-baseline='middle' font-size='${c*.55}' font-family='monospace' font-weight='700'`;
+  s+=w==null?`<rect ${a} fill='none' stroke='var(--mut)' stroke-dasharray='2 2'/><text ${t} fill='var(--mut)'>∞</text>`:`<rect ${a} rx='2' fill='var(--acc)'/><text ${t} fill='var(--bg)'>${kFmt(w)}</text>`}));
+ return s+`<rect x='${r*c+3}' y='${r*c+3}' width='${c-6}' height='${c-6}' fill='none' stroke='var(--ink)' stroke-width='2'/></svg>`}
+function kWed(Es,st){const n=st.Wt.length,ex=st.red==='max'?'-∞':'∞';Es.wed.innerHTML='';Es.wed.style.gridTemplateColumns=`repeat(${n},46px)`;
+ st.Wt.forEach((row,j)=>row.forEach((w,i)=>{const e=document.createElement('input');e.type='text';e.oninput=()=>kInf(e);e.value=w==null?ex:kFmt(w);
+  e.style.cssText='width:46px;height:46px;box-sizing:border-box;text-align:center;font:600 13px monospace;padding:0;'+(j===n>>1&&i===n>>1?'border-color:var(--acc)':'');
+  e.onchange=()=>{const t=e.value.trim();st.Wt[j][i]=(t===''||/inf|∞/i.test(t)||isNaN(+t))?null:+t;e.value=st.Wt[j][i]==null?ex:kFmt(st.Wt[j][i]);kPaint()};Es.wed.append(e)}))}
+function kWSync(Es,st){Es.red.value=st.red;Es.dx.value=st.dx;Es.dy.value=st.dy;Es.wsz.value=st.Wt.length;kWed(Es,st)}
+function kApplyW(st,pi){const[,Wt,dx,dy]=KPW[pi];st.Wt=Wt.map(r=>r.slice());st.dx=dx;st.dy=dy;st.red='min';st.seq=true;st.op='wt'}
+function kMove(d,i){const k=App.cur.k;kMig(k);const G=kGrid(k),{W:KW,H:KH}=G;if(i==null)i=Math.min(kui.act,k.steps.length-1);kui.act=i;const st=k.steps[i];kFixWt(st);let[x,y]=st.pos;st.moved=true;
+ if(st.op==='label'){const atEnd=st.placed&&y*KW+x===KW*KH-1;
+  if(d==='r'&&atEnd&&(st.tw||0)<(st.tn||0)){st.tw=(st.tw||0)+1;kPaint();return}
+  if(d==='l'&&(st.tw||0)>0){st.tw--;kPaint();return}}
+ if(st.op==='wt'){if(d==='u'||d==='d')return;const fwd=(st.dx==='lr')===(d==='r');st.pos=kSP(G,st,kCl(kSI(G,st,x,y)+(fwd?1:-1),0,KW*KH-1));st.placed=true;kPaint();return}
+ if(d==='r'){x++;if(x>=KW){x=0;y++}if(y>=KH){x=KW-1;y=KH-1}}
+ else if(d==='l'){x--;if(x<0){x=KW-1;y--}if(y<0){x=0;y=0}}
+ else if(d==='u')y=Math.max(0,y-1);else y=Math.min(KH-1,y+1);
+ st.pos=[x,y];st.placed=true;kPaint()}
+function kChain(i){const k=App.cur.k;kMig(k);const G=kGrid(k),{W:KW,H:KH}=G;const st=k.steps[i];kFixWt(st);
+ if(st.op==='wt'){st.pos=kSP(G,st,KW*KH-1);st.placed=true}else if(st.op==='label'){st.pos=[KW-1,KH-1];st.placed=true;st.tw=st.tn||0}else if(st.op==='apply'){st.pos=[KW-1,KH-1];st.placed=true}else st.done=Array(KW*KH).fill(1);
+ k.steps.length=i+1;k.steps.push({op:'erode',conn:8,K:KP[1][1].map(r=>r.slice()),pos:[0,0],placed:false,done:[],sig:''});kui.act=k.steps.length-1;renderKern();kPaint();
+ kE.steps[kui.act].main.scrollIntoView({block:'nearest',behavior:'smooth'})}
+function kInf(el){const p=el.selectionStart,a=el.value.slice(0,p).replace(/inf/ig,'∞').length;el.value=el.value.replace(/inf/ig,'∞');try{el.setSelectionRange(a,a)}catch(e){}}
+function kSeg(sel,labels){const g=mk('div','seg');
+ const btns=[...sel.options].map((o,n)=>{const b=mk('button','',labels?labels[n]:o.text);b.onclick=()=>{sel.value=o.value;sel.dispatchEvent(new Event('change'));upd()};g.append(b);return b}),
+  upd=()=>btns.forEach((b,n)=>b.setAttribute('aria-pressed',sel.options[n].value===sel.value));
+ upd();sel.hidden=true;return{el:g,upd}}
+function kAlgNorm(el){const f=s=>s.replace(/\(-\)/g,'\u2296').replace(/\(\+\)/g,'\u2295').replace(/\(o\)/gi,'\u2218').replace(/\(\.\)/g,'\u2022').replace(/&/g,'\u2229').replace(/\|/g,'\u222a').replace(/-/g,'\u2212').replace(/['~]/g,'\u1d9c');
+ const p=el.selectionStart,a=f(el.value.slice(0,p)).length;el.value=f(el.value);try{el.setSelectionRange(a,a)}catch(e){}}
+function kDrawLab(G,x,vals,mut,inp){for(let j=0;j<vals.length;j++){const v=vals[j];
+  if(mut&&mut(j)){x.globalAlpha=.4;const iv=inp[j];kCell(G,x,j,iv===0?'#fff':'#cfd8e3',iv===0?'0':kFmt(iv),'#123');x.globalAlpha=1;continue}
+  kCell(G,x,j,v?`hsl(${(v*67)%360},65%,76%)`:'#fff',v?kFmt(v):'0',v?'#222':'#999')}}
+function kTable(Es,st,T,prevT,win){Es.tcells.innerHTML='';
+ for(let l=1;l<T.length;l++){const d=mk('div','tc'+(prevT&&prevT[l]!==T[l]?' chg':'')+(l===win?' win':'')+(st.Tedit&&st.Tedit[l]!=null?' ed':''));d.append(mk('span','cap',l));
+  const e=document.createElement('input');e.type='text';e.value=T[l];e.onchange=()=>{const v=parseInt(e.value);if(isNaN(v)||v<1)delete st.Tedit[l];else st.Tedit[l]=v;kPaint()};d.append(e);Es.tcells.append(d)}
+ if(T.length<2)Es.tcells.textContent='(no labels yet)'}
+const KOP_LABELS=['Erosion','Dilation','Hit-or-miss','Algebra','Weighted min/max-plus','Sequential labeling','Relabel through table'];
+const KALG_SYMS=[['A','A (the input image)'],['B','B (the structuring element)'],['⊖','erosion'],['⊕','dilation'],['∘','opening'],['•','closing'],['∩','intersection (and)'],['∪','union (or)'],['−','difference'],['ᶜ','complement'],['(','('],[')',')']];
+const KALG_EXAMPLES=[['Boundary','A − (A ⊖ B)'],['Outer boundary','(A ⊕ B) − A'],['Gradient','(A ⊕ B) − (A ⊖ B)'],['Opening','(A ⊖ B) ⊕ B'],['Closing','(A ⊕ B) ⊖ B'],['Top-hat','A − ((A ⊖ B) ⊕ B)']];
+const KARROWS={l:['Left','M19 12H5M11 6l-6 6 6 6'],u:['Up','M12 19V5M6 11l6-6 6 6'],d:['Down','M12 5v14M6 13l6 6 6-6'],r:['Right','M5 12h14M13 6l6 6-6 6']};
+function kStepCard(E,k,st,i){
+ kFixWt(st);if(st.expr==null)st.expr='A − (A ⊖ B)';if(!st.Tedit)st.Tedit={};
+ const Es={segs:[]};E.steps[i]=Es;let G=kGrid(k);// refreshed in cell() and setPos(): the grid can be resized while this card is on screen
+ const c=mk('section','card'),go=()=>{kui.act=i;kPaint()},row=css=>{const r=mk('div','row');if(css)r.style.cssText=css;return r};
+ const btn=(l,f,cls)=>{const b=mk('button',cls||'',l);b.onclick=f;return b};
+ const sel=(opts)=>{const s=mk('select');s.innerHTML=opts.map(([v,l])=>`<option value='${v}'>${l}</option>`).join('');return s};
+ const seg=(s,labels)=>{const g=kSeg(s,labels);Es.segs.push(g.upd);return g};
+ const grp=(lab,el)=>{const g=mk('div','kg');g.append(mk('div','kgl',lab),el);return g};
+ const dragSrc=(el,key)=>{el.draggable=true;el.ondragstart=ev=>ev.dataTransfer.setData('text/plain','kern:'+key)};
+ const cell=e=>{kMig(k);G=kGrid(k);const{W:KW,H:KH}=G,r=Es.main.getBoundingClientRect(),m=Es.m||0;return[kCl(Math.floor((e.clientX-r.left)/r.width*(KW+2*m))-m,0,KW-1),kCl(Math.floor((e.clientY-r.top)/r.height*(KH+2*m))-m,0,KH-1)]};
+
+ // header
+ const h=mk('h2','',`Step ${i+1}${i?' (input = result of step '+i+')':''}`);
+ if(i>0)h.append(mk('span','sp'),btn('Remove this step',()=>{k.steps.length=i;kui.act=Math.min(kui.act,i-1);renderKern();kPaint()}));
+
+ // operation picker and scan controls
+ Es.op=sel(KOPS);Es.op.onchange=()=>{st.op=Es.op.value;go()};
+ Es.conn=sel([[4,'V4 connectivity'],[8,'V8 connectivity']]);Es.conn.onchange=()=>{st.conn=+Es.conn.value;go()};// lives in the labeling panel as a segmented control
+ const ar=mk('div','chips');
+ Object.entries(KARROWS).forEach(([d,[name,path]])=>{const b=btn(IC(`<path d='${path}'/>`),()=>kMove(d,i),'ibtn');b.title=name+' (arrow key)';b.setAttribute('aria-label',name);ar.append(b)});
+ const setPos=f=>()=>{kFixWt(st);G=kGrid(k);st.pos=f();st.placed=true;kui.act=i;if(st.op==='label')st.tw=st.pos[1]*G.W+st.pos[0]===G.W*G.H-1?(st.tn||0):0;kPaint()};
+ ar.append(btn('Start',setPos(()=>st.op==='wt'?kSP(G,st,0):[0,0])),btn('End',setPos(()=>st.op==='wt'?kSP(G,st,G.W*G.H-1):[G.W-1,G.H-1])),btn('Remove kernel',()=>{st.placed=false;go()}));
+ Es.pos=mk('span','cap');
+ const rOp=row();rOp.append(Es.op,seg(Es.op,KOP_LABELS).el,ar,Es.pos);
+
+ // panel: algebra expression
+ Es.alg=mk('div','kpanel');
+ const inp=document.createElement('input');inp.type='text';inp.spellcheck=false;inp.value=st.expr;
+ inp.style.cssText='width:100%;box-sizing:border-box;font:600 16px monospace;padding:8px 10px;border:1.5px solid var(--mut);border-radius:6px;background:var(--card);color:var(--ink)';
+ const setExpr=()=>{st.expr=inp.value;go()};inp.oninput=()=>{kAlgNorm(inp);setExpr()};
+ const ins=mk('div','chips');ins.style.margin='8px 0';
+ KALG_SYMS.forEach(([s,t])=>{const b=btn(s,()=>{const a=inp.selectionStart??inp.value.length,e=inp.selectionEnd??a;inp.value=inp.value.slice(0,a)+s+inp.value.slice(e);inp.focus();inp.setSelectionRange(a+s.length,a+s.length);setExpr()},'chip');b.title=t;ins.append(b)});
+ const ex=mk('div','chips');KALG_EXAMPLES.forEach(([l,x])=>{const b=btn(l,()=>{inp.value=x;setExpr()});b.title=x;ex.append(b)});
+ Es.err=mk('div','cap');Es.err.style.color='var(--curve)';
+ Es.alg.append(mk('div','kph','Expression'),inp,ins,mk('div','kgl','Examples'),ex,Es.err,mk('div','cap',"A = this step's input image, B = the structuring element below. You can also type (-) (+) (o) (.) for the morphology symbols, & | - for and, or, minus, and ' for complement."));
+
+ // panel: labeling
+ Es.lab=mk('div','kpanel');Es.lh=mk('div','kph','');Es.sc=seg(Es.conn,['V4: left, up','V8: left, up, up-left, up-right']);
+ Es.lmsg=mk('div','cap');Es.lmsg.style.color='var(--curve)';Es.lab.append(Es.lh,Es.sc.el,Es.lmsg);
+
+ // panel: binary structuring element
+ Es.r2=row('margin-top: 10px;');Es.r2.classList.add('kpanel');
+ Es.kh1=mk('div','kph','');Es.act1=mk('div','kact');
+ const pr=mk('div','chips');
+ Es.kpb=KP.map(([l,M],pi)=>{const b=btn(kSvg(M,16,false)+`<span class='cap'>${l}</span>`,()=>{st.K=M.map(r=>r.slice());Es.ksz.value=3;kEd(Es,st);st.placed=true;go()},'km');b.title=l;dragSrc(b,'p'+pi);pr.append(b);return b});
+ Es.ksz=sel([3,5,7].map(n=>[n,`${n} x ${n}`]));Es.ksz.value=st.K.length;
+ Es.ksz.onchange=()=>{const n=+Es.ksz.value;st.K=Array.from({length:n},()=>Array(n).fill(1));kEd(Es,st);kPaint()};
+ Es.ked=mk('div','ked');kEd(Es,st);dragSrc(Es.ked,'s'+i);Es.ked.title='Drag this kernel onto the image';
+ Es.kedHelp=mk('div','cap');
+ const ke=mk('div','col');ke.append(Es.kedHelp,Es.ksz,mk('div','kgl','Size'),seg(Es.ksz,['3 x 3','5 x 5','7 x 7']).el,Es.ked);
+ Es.r2.append(Es.kh1,Es.act1,pr,ke);
+
+ // panel: weighted (min/max-plus) kernel
+ Es.wt=row('margin-top: 10px;');Es.wt.classList.add('kpanel');Es.act2=mk('div','kact');
+ const pw=mk('div','chips');
+ KPW.forEach(([l,Wt],pi)=>{const b=btn(kSvgW(Wt,18)+`<span class='cap'>${l}</span>`,()=>{kApplyW(st,pi);kWSync(Es,st);go()},'km');b.title=l+' (also sets the scan direction)';dragSrc(b,'w'+pi);pw.append(b)});
+ Es.red=sel([['min','Reduce: minimum'],['max','Reduce: maximum']]);Es.red.onchange=()=>{st.red=Es.red.value;kWed(Es,st);kPaint()};
+ Es.dx=sel([['lr','Columns: left to right'],['rl','Columns: right to left']]);Es.dx.onchange=()=>{st.dx=Es.dx.value;kPaint()};
+ Es.dy=sel([['tb','Rows: top to bottom'],['bt','Rows: bottom to top']]);Es.dy.onchange=()=>{st.dy=Es.dy.value;kPaint()};
+ Es.wsz=sel([3,5].map(n=>[n,`${n} x ${n}`]));
+ Es.wsz.onchange=()=>{const n=+Es.wsz.value;st.Wt=Array.from({length:n},(_,j)=>Array.from({length:n},(_,q)=>j===n>>1&&q===n>>1?0:null));kWed(Es,st);kPaint()};
+ const sq=mk('div','seg');[['Sequential',true],['From input',false]].forEach(([l,v])=>sq.append(btn(l,()=>{st.seq=v;kPaint()})));
+ Es.wed=mk('div','ked');
+ const g1=seg(Es.red,['Minimum','Maximum']),g2=seg(Es.dx,['Left to right','Right to left']),g3=seg(Es.dy,['Top to bottom','Bottom to top']),g4=seg(Es.wsz,['3 x 3','5 x 5']);
+ Es.segs.push(()=>[...sq.children].forEach((b,n)=>b.setAttribute('aria-pressed',(n===0)===!!st.seq)));
+ const dg=mk('div','cap','Drag this kernel onto the image');dragSrc(dg,'s'+i);dg.style.cssText='cursor:grab;border:1px dashed var(--line);border-radius:6px;padding:4px 8px;width:max-content';
+ const ctl=mk('div','col');
+ ctl.append(mk('div','cap','Each cell is a weight added to the pixel under it. ∞ = unused cell (type inf or ∞).'),grp('Combine neighbors by',g1.el),grp('Scan columns',g2.el),grp('Scan rows',g3.el),grp('Each cell reads',sq),grp('Size',g4.el),dg,Es.wed,Es.red,Es.dx,Es.dy,Es.wsz);
+ Es.wt.append(mk('div','kph','Kernel programming'),Es.act2,pw,ctl);kWSync(Es,st);
+
+ // input grid (left) and result grid (right)
+ const rIo=row('margin-top: 10px; align-items: flex-end;'),a=mk('div','kcol'),b=mk('div','kcol');
+ if(i===0){const vr=mk('div','chips');E.views={};
+  [['drawing','Drawing'],['thresh','Thresholded'],['numbers','Binary numbers']].forEach(([v,l])=>{const x=btn(l,()=>{k.view=v;kPaint()},'chip');E.views[v]=x;vr.append(x)});
+  a.append(vr,kInputValues(E,k))}
+ else a.append(mk('div','cap',`Input: result of step ${i}`));
+ Es.main=mk('canvas','v kcv');Es.out=mk('canvas','v kcv');Es.out.style.cursor='default';
+ Es.ghost=mk('canvas','kghost');Es.pulse=mk('div','kpulse');Es.pulse.hidden=true;
+ const wrap=mk('div','kwrap');wrap.append(Es.main,Es.ghost,Es.pulse);a.append(wrap);
+ const mh=mk('div','mh'),mb=mk('button','ibtn',IC(`<circle cx='5' cy='12' r='1.5'/><circle cx='12' cy='12' r='1.5'/><circle cx='19' cy='12' r='1.5'/>`)),mn=mk('div','menu');
+ mb.title='Result options';mb.setAttribute('aria-label','Result options');mn.hidden=true;
+ mb.onclick=ev=>{ev.stopPropagation();const o=mn.hidden;document.querySelectorAll('.menu').forEach(z=>z.hidden=true);mn.hidden=!o};
+ Es.chain=btn('Use as input for new operation',()=>{mn.hidden=true;kChain(i)});Es.chain.title='Finishes this step\'s scan, then starts a new operation below';
+ const rr=btn('Reset result',()=>{mn.hidden=true;st.done=[];st.placed=false;st.pos=[0,0];st.Tedit={};st.tw=0;st.moved=false;go()});rr.title='Start this step again: clears the scan progress and table edits';
+ mn.append(Es.chain,rr);mh.append(mk('span','cap','Result'),mb,mn);b.append(mh,Es.out);rIo.append(a,b);
+
+ // correspondence table
+ Es.tbx=mk('div','kpanel');const th=mk('div','mh');
+ Es.tbxCap=mk('span','cap','Correspondence table T (editable; teal ring = changed, dark outline = entry being upgraded, red = edited by you)');
+ Es.tbxReset=btn('Reset edits',()=>{st.Tedit={};kPaint()});th.append(Es.tbxCap,Es.tbxReset);
+ Es.tcells=mk('div','tcells');Es.tbx.append(th,Es.tcells);
+
+ c.append(h,rOp,Es.alg,Es.lab,Es.r2,Es.wt,rIo,Es.tbx);
+
+ // pointer interaction on the input grid: drawing (step 1) or placing the kernel
+ let drag=null;
+ Es.main.oncontextmenu=e=>e.preventDefault();
+ Es.main.onpointerdown=e=>{Es.main.setPointerCapture(e.pointerId);kui.act=i;const p=cell(e);
+  if(i===0&&k.tool==='paint'){const er=e.button===2||e.shiftKey;kPx(G,k,p,er);drag={t:'paint',er};kPaint();return}
+  if(i>0||k.view!=='drawing'){st.pos=p;st.placed=true;kui.dragging=true;drag={t:'kern'};kPaint();return}
+  if(k.tool==='select'){const hit=[...k.shapes].reverse().find(q=>kcells(G,q)[p[1]*G.W+p[0]]);
+   if(!hit){if(!e.shiftKey)kui.sel.clear();drag=null;kPaint();return}
+   const ids=hit.g?k.shapes.filter(q=>q.g===hit.g).map(q=>q.id):[hit.id];
+   if(e.shiftKey){ids.every(z=>kui.sel.has(z))?ids.forEach(z=>kui.sel.delete(z)):ids.forEach(z=>kui.sel.add(z))}else if(!kui.sel.has(hit.id)){kui.sel.clear();ids.forEach(z=>kui.sel.add(z))}
+   drag={t:'move',last:p};kui.dragging=true;kPaint();return}
+  kui.draft=k.tool==='free'?{id:k.nx,t:'free',pts:[p],fill:false,g:0}:{id:k.nx,t:k.tool,a:p,b:p,fill:k.fill,g:0};drag={t:'draw'};kPaint()};
+ Es.main.onpointermove=e=>{if(!drag)return;const p=cell(e);
+  if(drag.t==='paint')kPx(G,k,p,drag.er);
+  else if(drag.t==='kern')st.pos=p;
+  else if(drag.t==='move'){const dx=p[0]-drag.last[0],dy=p[1]-drag.last[1];if(!dx&&!dy)return;drag.last=p;
+   k.shapes.forEach(q=>{if(!kui.sel.has(q.id))return;if(q.t==='free')q.pts=q.pts.map(z=>[z[0]+dx,z[1]+dy]);else{q.a=[q.a[0]+dx,q.a[1]+dy];q.b=[q.b[0]+dx,q.b[1]+dy]}})}
+  else if(kui.draft){if(kui.draft.t==='free'){const l=kui.draft.pts[kui.draft.pts.length-1];if(l[0]!==p[0]||l[1]!==p[1])kui.draft.pts.push(p)}else kui.draft.b=p}
+  kPaint()};
+ Es.main.onpointerup=Es.main.onpointercancel=()=>{if(drag&&drag.t==='draw'&&kui.draft){kui.draft.id=k.nx++;k.shapes.push(kui.draft);kui.sel.clear();kui.sel.add(kui.draft.id)}kui.draft=null;drag=null;kui.dragging=false;kPaint()};
+ Es.main.ondragover=e=>e.preventDefault();
+ Es.main.ondrop=e=>{e.preventDefault();const t=e.dataTransfer.getData('text/plain');if(t.indexOf('kern:')!==0)return;const q=t.slice(5),n=+q.slice(1);
+  const takeK=K=>{st.K=K.map(r=>r.slice());if(st.op==='wt')st.op='erode';Es.ksz.value=st.K.length;kEd(Es,st)};
+  if(q[0]==='p'&&KP[n])takeK(KP[n][1]);
+  else if(q[0]==='w'&&KPW[n])kApplyW(st,n);
+  else if(q[0]==='s'&&k.steps[n]){const o=k.steps[n];kFixWt(o);if(o.op==='wt'){st.Wt=o.Wt.map(r=>r.slice());st.red=o.red;st.seq=o.seq;st.dx=o.dx;st.dy=o.dy;st.op='wt'}else takeK(o.K)}
+  kWSync(Es,st);st.pos=cell(e);st.placed=true;go()};
+ return c}
+// "1s read as / 0s read as" fields and the numeric grid paste box (step 1 only)
+function kInputValues(E,k){
+ const inr=mk('div','row');inr.style.cssText='gap:10px;margin:6px 0;align-items:center';
+ const fld=(lab,key,ref)=>{const l=mk('label','sw',`${lab} <input type='text' class='sq'>`),inp=l.querySelector('input'),b=mk('button','','∞');b.title='Use ∞';
+  inp.oninput=()=>kInf(inp);inp.onchange=()=>{k[key]=inp.value.trim()||(key==='in1s'?'1':'0');kPaint()};b.onclick=()=>{k[key]='∞';kPaint()};E[ref]=inp;inr.append(l,b)};
+ fld('1s read as','in1s','in1');fld('0s read as','in0s','in0');
+ const det=mk('details','',`<summary class='cap'>Paste a grid of numbers (use ∞ for infinity)</summary>`),ta=mk('textarea');ta.rows=6;ta.cols=30;ta.placeholder='0 0 0 0\n0 ∞ ∞ 0\n0 ∞ ∞ 0';ta.oninput=()=>kInf(ta);ta.style.cssText='font:13px monospace;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:6px';
+ const ld=mk('button','','Load grid');ld.onclick=()=>{const rows=ta.value.trim().split(/\n+/).map(l=>l.trim().split(/[\s,;]+/)).filter(r=>r[0]!=='');if(!rows.length)return;
+  const W=kCl(Math.max(...rows.map(r=>r.length)),4,32),H=kCl(rows.length,4,32);k.W=W;k.H=H;k.num=Array.from({length:W*H},(_,j)=>{const r=rows[(j/W)|0];return r&&r[j%W]!=null?r[j%W]:'0'});kPaint()};
+ E.clr=mk('button','','Clear pasted grid');E.clr.hidden=true;E.clr.onclick=()=>{delete k.num;kPaint()};
+ const bt=mk('div','chips');bt.append(ld,E.clr);det.append(ta,bt);inr.append(det);return inr}
+function kRunMorph(G,st,Es,E,input){return{full:Float64Array.from(kout(G,st,kBin(input)).v),lim:-1}}
+const KRUN={
+ erode:kRunMorph,dilate:kRunMorph,hm:kRunMorph,
+ alg(G,st,Es,E,input){const r=kalg(G,st.expr||'A',kBin(input),st.K);Es.err.textContent=r.err||'';return{full:Float64Array.from(r.err?new Uint8Array(input.length):r.v),lim:-1}},
+ wt(G,st,Es,E,input){const lim=st.placed?kSI(G,st,st.pos[0],st.pos[1]):-1;return{full:kwt(G,input,st),part:kwt(G,input,st,lim),lim}},
+ label(G,st,Es,E,input,idx){
+  const lim=st.placed?idx:-1,F=klab(G,input,st),P=klab(G,input,st,lim),n=F.T.length-1,done=lim===G.W*G.H-1,tw=done?kCl(st.tw||0,0,n):0;
+  let msg='',tblPart;st.tw=tw;st.tn=n;Es.tdone=done;Es.twl=done?tw:0;
+  if(done){Es.told=F.T;tblPart=kWithEdits(st,kFlat(F.T,tw));Es.tprev=kWithEdits(st,kFlat(F.T,Math.max(0,tw-1)));
+   if(tw>0){const T0=kFlat(F.T,tw-1);let m=tw,path=[tw],g=0;while(T0[m]!==m&&g++<999){m=T0[m];path.push(m)}msg=`Upgrading the table: l = ${tw}: ${path.join(' → ')}, so T[${tw}] = ${m}.`}
+   else if(n)msg='Image scan complete. Keep pressing the right arrow to upgrade the table one entry at a time.'}
+  else{Es.told=null;tblPart=kWithEdits(st,P.T);Es.tprev=lim>0?kWithEdits(st,klab(G,input,st,lim-1).T):null}
+  kLabMsg(Es,msg,true);
+  return{full:F.E,part:P.E,lim,tblOut:kWithEdits(st,kFlat(F.T,n)),tblPart}},
+ apply(G,st,Es,E,input,idx){
+  if(!E.tbl){kLabMsg(Es,'This step needs a correspondence table: put a Sequential labeling step before it.',false);return{full:input,part:input,lim:-1}}
+  const T=E.tbl,full=input.map(v=>v?(T[v]!=null?T[v]:v):0);kLabMsg(Es,'',true);
+  return{full,part:full,lim:st.placed?idx:-1}}};
+function kLabMsg(Es,msg,ok){Es.lmsg.textContent=msg;Es.lmsg.style.color=ok?'var(--mut)':'var(--curve)'}
+function kPaint(){
+ const s=App.cur,E=kE;if(!s||!s.k||!E||App.tab!=='kern')return;save();
+ const k=s.k;kMig(k);const G=kGrid(k),{W:KW,H:KH}=G;const css=getComputedStyle(document.documentElement),col={acc:css.getPropertyValue('--acc').trim(),crv:css.getPropertyValue('--curve').trim()};
+ E.fill.checked=k.fill;E.gw.value=k.W;E.gh.value=k.H;E.in1.value=k.in1s||'1';E.in0.value=k.in0s||'0';E.clr.hidden=!k.num;E.tbl=null;
+ Object.entries(E.tools).forEach(([t,b])=>b.setAttribute('aria-pressed',k.tool===t));
+ Object.entries(E.views).forEach(([t,b])=>b.setAttribute('aria-pressed',k.view===t));
+ const v1=kNum(k.in1s||'1'),v0=kNum(k.in0s||'0');
+ let input=k.num?Float64Array.from({length:KW*KH},(_,j)=>kNum(k.num[j]==null?'0':k.num[j])):Float64Array.from(kimg(G,k),v=>v?v1:v0),prev=JSON.stringify([k.shapes,k.px,k.W,k.H,k.in1s,k.in0s,k.num]);
+ k.steps.forEach((st,i)=>{
+  const Es=E.steps[i];if(!Es)return;
+  if(!KOPS.some(o=>o[0]===st.op))st.op='erode';kFixWt(st);
+  st.pos=[kCl(st.pos[0]|0,0,KW-1),kCl(st.pos[1]|0,0,KH-1)];
+  const sig=prev+JSON.stringify([st.op,st.K,st.Wt,st.red,st.seq,st.dx,st.dy,st.expr,st.conn,st.Tedit]);if(st.sig!==sig||!st.done){st.sig=sig;st.done=[]}
+  const idx=st.pos[1]*KW+st.pos[0];if(st.placed&&st.op!=='wt')st.done[idx]=1;
+  const r=KRUN[st.op](G,st,Es,E,input,idx);
+  kDrawInput(G,Es,k,st,i,input,v1!==1||v0!==0,col);
+  kDrawResult(G,Es,st,r,input,col);
+  kSyncStep(G,Es,E,k,st,i,r,input,idx,col);
+  E.tbl=r.tblOut||null;prev=sig;input=r.full});
+ drawSide()}
+function kDrawInput(G,Es,k,st,i,input,remapped,{acc,crv}){const{C:KC,H:KH,W:KW}=G;
+ Es.m=kM(st);Es.R=Es.m;const x=prepM(G,Es.main,Es.m),W=KW*KC,H=KH*KC;
+ if(i===0&&k.view==='drawing'&&!k.num){
+  x.strokeStyle='#e6e6e6';x.lineWidth=1;x.beginPath();for(let a=0;a<=KW;a++){x.moveTo(a*KC+.5,0);x.lineTo(a*KC+.5,H)}for(let b=0;b<=KH;b++){x.moveTo(0,b*KC+.5);x.lineTo(W,b*KC+.5)}x.stroke();
+  (kui.draft?[...k.shapes,kui.draft]:k.shapes).forEach(sh=>kDraw(G,x,sh));
+  for(const key in k.px){if(k.px[key]!==1)continue;const[a,b]=key.split(',').map(Number);if(kIn(G,a,b)){x.fillStyle='#333';x.fillRect(a*KC,b*KC,KC,KC)}}
+  if(kui.sel.size)kSelBox(G,x,k,acc);
+ }else if(i>0&&k.steps[i-1].op==='label')kDrawLab(G,x,input,null,input);
+ else kDrawVals(G,x,input,null,i>0||k.view==='numbers'||!!k.num||remapped);
+ if(!st.placed)return;
+ x.save();x.beginPath();x.rect(0,0,W,H);x.clip();
+ if(st.op==='wt')kKernelW(G,x,st,acc);
+ else if(st.op==='apply'){x.strokeStyle=acc;x.lineWidth=4;x.strokeRect(st.pos[0]*KC+2,st.pos[1]*KC+2,KC-4,KC-4)}
+ else kKernel(G,x,{K:kEff(st),pos:st.pos},acc,crv);
+ x.restore()}
+function kDrawResult(G,Es,st,r,input,{acc}){const{C:KC,W:KW}=G;
+ const x=prepM(G,Es.out,Es.m),lim=r.lim;
+ if(st.op==='label'||st.op==='apply')kDrawLab(G,x,r.part,j=>j>lim,input);
+ else if(st.op==='wt')kDrawVals(G,x,r.part,j=>kSI(G,st,j%KW,(j/KW)|0)>lim,true);
+ else r.full.forEach((v,j)=>{if(!st.done[j])kCell(G,x,j,'#ececec','','');else kCell(G,x,j,v?'#222':'#fff',v,v?'#fff':'#999')});
+ if(st.op==='label'&&Es.twl){x.save();x.strokeStyle='#000';x.lineWidth=3;r.part.forEach((v,j)=>{if(v===Es.twl)x.strokeRect((j%KW)*KC+2,((j/KW)|0)*KC+2,KC-4,KC-4)});x.restore()}
+ if(st.placed){x.strokeStyle=acc;x.lineWidth=3;x.strokeRect(st.pos[0]*KC+1.5,st.pos[1]*KC+1.5,KC-3,KC-3)}}
+function kSyncStep(G,Es,E,k,st,i,r,input,idx,{acc,crv}){const{H:KH,W:KW}=G;
+ const op=st.op,wt=op==='wt',isLab=op==='label'||op==='apply';
+ // correspondence table panel
+ if(op==='label'){if(Es.wasDone!==undefined&&Es.tdone&&!Es.wasDone){Es.tbx.classList.remove('pulse');void Es.tbx.offsetWidth;Es.tbx.classList.add('pulse')}Es.wasDone=!!Es.tdone}
+ if(op==='apply'&&E.tbl){Es.tbx.hidden=false;Es.tbxCap.textContent='Upgraded table T (read-only reference): the outlined entry is the one the box is using';Es.tbxReset.hidden=true;kTableRO(Es,E.tbl,st.placed?input[idx]:0)}
+ else if(op==='label'){Es.tbxCap.textContent='Correspondence table T (editable; teal ring = changed, dark outline = entry being upgraded, red = edited by you)';Es.tbxReset.hidden=false;Es.tcells.style.opacity='';Es.tbx.hidden=false;kTable2(Es,st,r.tblPart||[0],Es.tprev,Es.twl,Es.told)}
+ else Es.tbx.hidden=true;
+ // which panels are visible
+ Es.op.value=op;Es.r2.hidden=wt||isLab;Es.wt.hidden=!wt;Es.alg.hidden=op!=='alg';Es.lab.hidden=!isLab;Es.sc.el.hidden=op!=='label';Es.conn.value=st.conn;
+ Es.lh.textContent={label:'Labeling pass, then table upgrade: scan the image with the arrows; once it is complete, keep stepping right to upgrade the table entry by entry',apply:'Relabel through the table: move the box over the pixels; each pixel takes its value from the upgraded table'}[op]||'';
+ if(Es.lastOp!==op){Es.lastOp=op;kEd(Es,st);
+  Es.kh1.textContent={erode:'Structuring element - erosion keeps a pixel only if every teal cell lies on foreground',dilate:'Structuring element - dilation sets a pixel if any teal cell touches foreground',hm:'Hit-or-miss pattern',alg:'B = structuring element'}[op]||'';
+  Es.kedHelp.textContent=op==='hm'?'Drag the kernel onto the image. Click a cell to cycle teal 1 (foreground), red 0 (background), dashed (ignored).':'Drag the kernel onto the image. Click a cell to switch it on (teal) or off (dashed).'}
+ Es.segs.forEach(f=>f());
+ // highlight the preset that matches the current kernel
+ const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b),bi=KP.findIndex(([,M])=>same(M,st.K)),wi=KPW.findIndex(([,Wt,dx,dy])=>same(Wt,st.Wt)&&dx===st.dx&&dy===st.dy&&st.red==='min');
+ Es.kpb.forEach((b,pi)=>{b.hidden=op!=='hm'&&pi>3;b.setAttribute('aria-pressed',pi===bi)});
+ [...Es.wt.querySelectorAll('button.km')].forEach((b,pi)=>b.setAttribute('aria-pressed',pi===wi));
+ Es.act1.innerHTML=`Active: <b>${bi>=0?KP[bi][0]:'Custom'}</b> (${st.K.length} x ${st.K.length})`;
+ Es.act2.innerHTML=`Active: <b>${wi>=0?KPW[wi][0]:'Custom'}</b> (${st.Wt.length} x ${st.Wt.length})`;
+ // status line
+ Es.pos.textContent=
+  op==='apply'?(st.placed?`Box at (${st.pos[0]}, ${st.pos[1]}), pixel ${idx+1} of ${KW*KH}. Each pixel takes its value from the table.`:'Click a pixel in the input grid to place the box, then step with the arrows. The image is relabeled as the box moves.')
+  :op==='label'&&Es.tdone&&Es.tn?`Image scan complete. Table upgrade: ${st.tw||0} of ${Es.tn} entries (right arrow continues, left arrow goes back).`
+  :!st.placed?'Drag a kernel onto the image, then step with the arrows. The result fills in as the kernel moves.'
+  :wt?`Scan position ${r.lim+1} of ${KW*KH}, cell (${st.pos[0]}, ${st.pos[1]}). Cells before it are updated; the rest still hold their input values.`
+  :`Kernel anchor (${st.pos[0]}, ${st.pos[1]}) · step ${idx+1} of ${KW*KH}`;
+ // kernel ghost outside the grid border, and the "drag me" pulse
+ const n=wt?st.Wt.length:op==='label'?3:op==='apply'?1:st.K.length,rr=n>>1,m=Es.m||0,TW=KW+2*m,TH=KH+2*m;
+ kGhost(G,Es,st,wt,acc,crv);Es.pulse.hidden=!(st.placed&&!st.moved);
+ Es.pulse.style.cssText=`left:${(st.pos[0]-rr+m)/TW*100}%;top:${(st.pos[1]-rr+m)/TH*100}%;width:${n/TW*100}%;height:${n/TH*100}%`;
+ Es.chain.disabled=i!==k.steps.length-1;
+ Es.main.style.cursor=i===0&&k.tool==='paint'?'cell':(i>0||k.view!=='drawing')?(kui.dragging?'grabbing':'grab'):k.tool==='select'?(kui.dragging?'grabbing':'default'):kCur(k.tool)}
+function kTable2(Es,st,T,prevT,win,old){const el=Es.tcells;
+ if(!old){kTable(Es,st,T,prevT,win);return}
+ el.innerHTML='';const lead=mk('div','tc');lead.append(mk('span','cap','label'),mk('span','cap tlab','old'),mk('span','cap tlab','new'));el.append(lead);
+ for(let l=1;l<T.length;l++){const ed=st.Tedit&&st.Tedit[l]!=null,proc=l<=win||ed,chg=l<=win&&T[l]!==old[l];
+  const d=mk('div','tc'+(l===win?' win':'')+(chg?' chg':'')+(ed?' ed':''));d.append(mk('span','cap',l),mk('div','tco',old[l]));
+  const e=document.createElement('input');e.type='text';e.value=proc?T[l]:'';e.placeholder='\u00b7';
+  e.onchange=()=>{const v=parseInt(e.value);if(isNaN(v)||v<1)delete st.Tedit[l];else st.Tedit[l]=v;kPaint()};d.append(e);el.append(d)}}
+function kTableRO(Es,T,hl){const el=Es.tcells;el.innerHTML='';el.style.opacity='.75';
+ for(let l=1;l<T.length;l++){const d=mk('div','tc'+(l===hl?' win':''));d.append(mk('span','cap',l),mk('div','tco',T[l]));el.append(d)}}
+function kGhost(G,Es,st,wt,acc,crv){const{C:KC,H:KH,W:KW}=G;const R=Es.R||0,g=Es.ghost;if(!g)return;
+ const K=wt?st.Wt:st.op==='label'?kEff(st):st.op==='apply'?null:st.K;
+ if(!K||!st.placed||!R){g.classList.remove('on');return}
+ const n=K.length,r=n>>1,[px,py]=st.pos,kc=new Map(),cols=new Set(),rows=new Set();
+ for(let j=0;j<n;j++)for(let i=0;i<n;i++){const xx=px+i-r,yy=py+j-r;kc.set(xx+','+yy,K[j][i]);if(xx<0||xx>=KW)cols.add(xx);if(yy<0||yy>=KH)rows.add(yy)}
+ if(!cols.size&&!rows.size){g.classList.remove('on');return}
+ const W=KW*KC,H=KH*KC;g.width=W+2*R*KC;g.height=H+2*R*KC;g.style.left='0';g.style.top='0';g.style.width='100%';g.style.height='100%';
+ const x=g.getContext('2d');x.font=KC*.4+'px monospace';x.textAlign='center';x.textBaseline='middle';x.translate(R*KC,R*KC);
+ const cells=new Set();
+ cols.forEach(a=>{for(let b=0;b<KH;b++)cells.add(a+','+b)});rows.forEach(b=>{for(let a=0;a<KW;a++)cells.add(a+','+b)});
+ kc.forEach((v,key)=>{const[a,b]=key.split(',').map(Number);if(!kIn(G,a,b))cells.add(key)});
+ cells.forEach(key=>{const[a,b]=key.split(',').map(Number);x.fillStyle='rgba(140,140,140,.35)';x.fillRect(a*KC,b*KC,KC,KC);x.strokeStyle='rgba(140,140,140,.55)';x.lineWidth=1;x.strokeRect(a*KC+.5,b*KC+.5,KC-1,KC-1);
+  if(!wt&&!kc.has(key)){x.fillStyle='rgba(120,120,120,.9)';x.fillText('0',a*KC+KC/2,b*KC+KC/2+1)}});
+ x.save();x.beginPath();x.rect(-R*KC,-R*KC,W+2*R*KC,H+2*R*KC);x.rect(0,0,W,H);x.clip('evenodd');
+ if(wt)kKernelW(G,x,st,acc);else kKernel(G,x,{K,pos:st.pos},acc,crv);x.restore();
+ g.classList.add('on')}
+function kM(st){return st.op==='wt'?(st.Wt||[[0]]).length>>1:st.op==='label'?1:st.op==='apply'?0:((st.K||[[1]]).length>>1)}
+function prepM(G,c,m){const{C:KC,H:KH,W:KW}=G;const W=KW*KC,H=KH*KC;c.width=W+2*m*KC;c.height=H+2*m*KC;const x=c.getContext('2d');
+ x.clearRect(0,0,c.width,c.height);x.font=KC*.4+'px monospace';x.textAlign='center';x.textBaseline='middle';
+ x.fillStyle='#fff';x.fillRect(m*KC,m*KC,W,H);x.strokeStyle='#8a8f96';x.lineWidth=1;x.strokeRect(m*KC-.5,m*KC-.5,W+1,H+1);x.translate(m*KC,m*KC);return x}
+const hooks={render:renderKern,paint:()=>kPaint(),thumb:kThumb,newSession:newKern,noImages:true};
+registerTab('kern',hooks);
+return{...hooks,KP,KPW};
+})();
+
+/* ==== 6. TAB: Otsu threshold ========================================================================== */
+const OtsuTab=(()=>{
+const{isodata,lum,otsuCalc}=Algos;
+const{$,emptyState,IC,mk,paintImg,registerTab,save}=Core;
+
+let oE=null,otPlay=0;
+const TXC={};
+function txc(q){const k=(window.mjReady?1:0)+q;return TXC[k]||(TXC[k]=tx(q))}
+const cssv=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+function otAxes(x,W,H,top,mut){const bw=W/256;x.save();x.fillStyle=mut;x.strokeStyle=mut;x.font='11px sans-serif';x.lineWidth=1;x.textBaseline='alphabetic';
+ [0,64,128,192,255].forEach(v=>{const X=(v+.5)*bw;x.beginPath();x.moveTo(X,H-18);x.lineTo(X,H-14);x.stroke();x.textAlign=v===0?'left':v===255?'right':'center';x.fillText(v,v===0?2:v===255?W-2:X,H-3)});
+ x.textAlign='left';x.fillText('0',3,H-21);if(top!=null)x.fillText(top,3,11);x.restore()}
+function otWrap(E,cv,k){if(!E.ov)E.ov=[];
+ const w=mk('div','owrap'),ov=document.createElement('canvas'),tip=mk('div','otip');tip.hidden=true;
+ ov.style.cssText='position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none';E.ov[k]=ov;
+ w.style.cssText='position:relative;width:100%;max-width:640px;touch-action:pan-y';w.append(cv,ov,tip);
+ w.onpointermove=e=>{const r=w.getBoundingClientRect(),i=Math.max(0,Math.min(255,Math.floor((e.clientX-r.left)/r.width*256)));otHover(E,i,w,tip,e.clientX-r.left,k)};
+ w.onpointerleave=()=>{E.ov.forEach(o=>{o.width=o.width});w.querySelector('.otip').hidden=true};
+ return w}
+function otHover(E,i,w,tip,px,k){const L=E.last;if(!L)return;const{o,h}=L,f=(v,k=3)=>(+v).toFixed(k);
+ E.ov.forEach((ov,j)=>{const W=512,H=j?120:170;ov.width=W;ov.height=H;const x=ov.getContext('2d'),X=(i+.5)*W/256;
+  x.strokeStyle=cssv('--ink');x.globalAlpha=.55;x.lineWidth=1;x.beginPath();x.moveTo(X,0);x.lineTo(X,H-18);x.stroke();x.globalAlpha=1;
+  if(j){x.fillStyle=cssv('--curve');x.beginPath();x.arc(X,H-18-(j===1?o.w0[i]:(o.best>0?o.sb[i]/o.best:0))*(H-30),4.5,0,7);x.fill()}});
+ const cum=h.slice(0,i+1).reduce((a,b)=>a+b,0);
+ tip.innerHTML=k===0?`<b>Gray level ${i}</b><br>${h[i].toLocaleString()} pixel${h[i]===1?'':'s'}`:k===1?`<b>${txc('t')} = ${i}</b><br>${txc('\\omega_0')} = <b>${f(o.w0[i],3)}</b> (${cum.toLocaleString()} pixels up to here)`:`<b>${txc('t')} = ${i}</b><br>${txc('\\sigma_B^2')} = <b>${f(o.sb[i],1)}</b>${i===o.bt?' (Otsu optimum)':''}`;
+ tip.hidden=false;const tw=tip.offsetWidth;tip.style.left=(px+14+tw>w.clientWidth?Math.max(0,px-14-tw):px+14)+'px'}
+window.addEventListener('resize',()=>{if(App.tab==='otsu')paintOtsu()});
+function renderOtsu(){
+ const m=$('main');m.innerHTML='';clearInterval(otPlay);otPlay=0;oE=null;
+ if(emptyState(m,'Click to choose a file, or press Ctrl/Cmd+V anywhere on this page.'))return;
+ const s=App.cur,E=oE={};if(!s.ot)s.ot={t:null};
+ const c1=mk('section','card',`<h2>Threshold</h2>`),r1=mk('div','row');r1.style.alignItems='center';
+ E.sl=document.createElement('input');E.sl.type='range';E.sl.min=0;E.sl.max=255;E.sl.style.cssText='flex:1 1 260px;accent-color:var(--acc)';
+ E.sl.oninput=()=>{clearInterval(otPlay);s.ot.t=+E.sl.value;paintOtsu()};
+ const mv=d=>{const o=otsuCalc(s.nodes[0].h),t=s.ot.t==null?o.bt:s.ot.t;s.ot.t=Math.max(0,Math.min(255,t+d));paintOtsu()};
+ const b=(l,f,ic)=>{const x=mk('button',ic?'ibtn':'',ic?IC(ic):l);x.title=l;x.setAttribute('aria-label',l);x.onclick=f;return x};
+ E.tv=mk('b','');E.tv.style.cssText='font:600 18px monospace;min-width:3ch';
+ E.play=b('Play the search',()=>{if(otPlay){clearInterval(otPlay);otPlay=0;paintOtsu();return}s.ot.t=0;paintOtsu();
+  otPlay=setInterval(()=>{if(s.ot.t>=255){clearInterval(otPlay);otPlay=0;s.ot.t=null}else s.ot.t++;paintOtsu()},45);paintOtsu()});
+ r1.append(mk('span','cap','t ='),E.tv,E.sl,b('Previous threshold',()=>{clearInterval(otPlay);otPlay=0;mv(-1)},`<path d='M19 12H5M11 6l-6 6 6 6'/>`),b('Next threshold',()=>{clearInterval(otPlay);otPlay=0;mv(1)},`<path d='M5 12h14M13 6l6 6-6 6'/>`),E.play,b('Go to the Otsu optimum',()=>{clearInterval(otPlay);otPlay=0;s.ot.t=null;paintOtsu()}));
+ r1.lastChild.textContent='Otsu optimum';r1.lastChild.className='';r1.lastChild.innerHTML='Otsu optimum';
+ c1.append(r1);m.append(c1);
+ const c2=mk('section','card'),r2=mk('div','row');
+ const col=(cap,cv)=>{const d=mk('div','col');d.style.flex='1 1 240px';d.append(mk('div','cap',cap),cv);return d};
+ E.src=mk('canvas','v img');E.res=mk('canvas','v img');
+ r2.append(col('Input (gray levels)',E.src),col('Thresholded: pixels above t become white',E.res));c2.append(r2);m.append(c2);
+ const c3=mk('section','card');E.hc=mk('canvas','v');E.vc=mk('canvas','v');E.cc=mk('canvas','v');E.cc.style.cssText='display:block;width:100%;max-width:640px;height:auto;aspect-ratio:512/120';
+ E.hc.style.cssText='display:block;width:100%;max-width:640px;height:auto;aspect-ratio:512/170';E.vc.style.cssText='display:block;width:100%;max-width:640px;height:auto;aspect-ratio:512/120';
+ const blk=(title,desc,yl,wrap,xl)=>{const d=mk('div','chart');d.style.margin='6px 0 20px';d.append(mk('div','',`<b>${title}</b>`),mk('div','cap',desc));
+  const r=mk('div','');r.style.cssText='display:flex;gap:6px;align-items:stretch;max-width:700px';wrap.style.flex='1 1 auto';r.append(mk('div','ylab',`<span>${yl}</span>`),wrap);d.append(r,mk('div','xlab',xl));return d},
+  swt=c=>`<span style='display:inline-block;width:10px;height:10px;border-radius:2px;background:${c};vertical-align:-1px'></span>`;
+ c3.append(
+  blk('Histogram of gray levels',`${swt('var(--acc)')} ${tx('C_0')}: levels up to ${tx('t')} &nbsp; ${swt('var(--curve)')} ${tx('C_1')}: levels above ${tx('t')} &nbsp; solid line: current ${tx('t')} &nbsp; dashed line: Otsu optimum ${tx('t^{*}')}`,'Number of pixels',otWrap(E,E.hc,0),`Gray level ${tx('i')}`),
+  blk('Cumulative distribution (CDF)',`The fraction of pixels with gray level up to ${tx('t')}: ${tx('\\omega_0(t)=\\sum_{i\\le t}p_i')}. It always rises from 0 to 1.`,tx('\\omega_0(t)'),otWrap(E,E.cc,1),`Threshold ${tx('t')} (gray level)`),
+  blk('Between-class variance',`${tx('\\sigma_B^2(t)=\\omega_0\\,\\omega_1\\,(\\mu_0-\\mu_1)^2')} for every possible ${tx('t')}. Otsu picks the highest point.`,tx('\\sigma_B^2(t)'),otWrap(E,E.vc,2),`Threshold ${tx('t')} (gray level)`));m.append(c3);
+ const c4=mk('section','card'),hd=mk('div','mh');hd.style.marginBottom='8px';E.h4=mk('h2','','Numbers at this threshold');E.h4.style.margin='0';
+ const sg=mk('div','seg');E.tabs=[['num','Numbers'],['der','Derivation']].map(([k,l])=>{const b=mk('button','',l);b.onclick=()=>{s.ot.tab=k;paintOtsu()};sg.append(b);return[k,b]});hd.append(E.h4,sg);
+ E.pn=mk('div');E.stats=mk('div','ostat');E.note=mk('div','cap');E.note.style.lineHeight='1.6';E.pn.append(E.stats,E.note);E.der=mk('div');c4.append(hd,E.pn,E.der);m.append(c4);
+}
+function tx(q,d){if(window.mjReady&&window.MathJax&&MathJax.tex2svg){try{return MathJax.tex2svg(q,{display:!!d}).outerHTML}catch(e){}}return '<code>'+q.replace(/</g,'&lt;')+'</code>'}
+function paintOtsu(){const s=App.cur,E=oE;if(!s||s.empty||!E||App.tab!=='otsu')return;save();
+ const n=s.nodes[0];if(!n.out||!n.h)return;if(!s.ot)s.ot={t:null};
+ const o=otsuCalc(n.h),iso=isodata(o),t=s.ot.t==null?o.bt:s.ot.t;E.last={o,h:n.h,t};
+ const cs=getComputedStyle(document.documentElement),acc=cs.getPropertyValue('--acc').trim(),crv=cs.getPropertyValue('--curve').trim(),ink=cs.getPropertyValue('--ink').trim(),mut=cs.getPropertyValue('--mut').trim();
+ E.sl.value=t;E.tv.textContent=t;E.play.setAttribute('aria-pressed',!!otPlay);
+ paintImg(E.src,s,n.out);
+ const cw=E.src.parentNode.clientWidth||300,wpx=Math.max(120,Math.min(cw,300*s.w/s.h,640));E.src.style.width=E.res.style.width=wpx+'px';E.src.style.height=E.res.style.height='auto';
+ const d=new Uint8ClampedArray(n.out.length);for(let i=0;i<d.length;i+=4){const v=lum(n.out,i)>t?255:0;d[i]=d[i+1]=d[i+2]=v;d[i+3]=255}paintImg(E.res,s,d);
+ let c=E.hc,x=c.getContext('2d');const W=c.width=512,H=c.height=170,bw=W/256,X=v=>(v+.5)*bw,mx=Math.sqrt(Math.max(...n.h)||1);
+ x.clearRect(0,0,W,H);
+ for(let i=0;i<256;i++){const bh=Math.sqrt(n.h[i])/mx*(H-22);x.globalAlpha=.85;x.fillStyle=i<=t?acc:crv;x.fillRect(i*bw,H-18-bh,bw+.5,bh)}
+ x.globalAlpha=1;x.strokeStyle=mut;x.lineWidth=1;x.beginPath();x.moveTo(0,H-17.5);x.lineTo(W,H-17.5);x.stroke();
+ 
+ x.setLineDash([5,4]);x.beginPath();x.moveTo(X(o.bt),0);x.lineTo(X(o.bt),H-18);x.stroke();x.setLineDash([]);
+ x.strokeStyle=ink;x.lineWidth=2;x.beginPath();x.moveTo(X(t),0);x.lineTo(X(t),H-18);x.stroke();
+ x.fillStyle=ink;x.textAlign=t>200?'right':'left';x.fillText('t = '+t,X(t)+(t>200?-5:5),12);
+ c=E.cc;x=c.getContext('2d');const H3=c.height=120;c.width=W;x.clearRect(0,0,W,H3);
+ const Yc=v=>H3-18-v*(H3-30);
+ x.strokeStyle=mut;x.lineWidth=1;x.globalAlpha=.3;x.beginPath();x.moveTo(0,Yc(.5));x.lineTo(W,Yc(.5));x.moveTo(0,Yc(1));x.lineTo(W,Yc(1));x.stroke();x.globalAlpha=1;
+ x.fillStyle=mut;x.font='11px sans-serif';x.textAlign='left';x.fillText('1',2,Yc(1)-3);x.fillText('0.5',2,Yc(.5)-3);
+ x.strokeStyle=ink;x.lineWidth=2;x.beginPath();o.w0.forEach((v,i)=>{i?x.lineTo(X(i),Yc(v)):x.moveTo(X(i),Yc(v))});x.stroke();
+ x.strokeStyle=mut;x.lineWidth=1;x.beginPath();x.moveTo(0,H3-17.5);x.lineTo(W,H3-17.5);x.stroke();
+ 
+ x.setLineDash([5,4]);x.beginPath();x.moveTo(X(o.bt),0);x.lineTo(X(o.bt),H3-18);x.stroke();x.setLineDash([]);
+ x.strokeStyle=ink;x.beginPath();x.moveTo(X(t),0);x.lineTo(X(t),H3-18);x.stroke();
+ x.fillStyle=crv;x.beginPath();x.arc(X(t),Yc(o.w0[t]),5,0,7);x.fill();
+ x.fillStyle=ink;x.font='11px sans-serif';x.textAlign=t>200?'right':'left';x.fillText(o.w0[t].toFixed(3),X(t)+(t>200?-9:9),Math.max(12,Yc(o.w0[t])-6));
+ c=E.vc;x=c.getContext('2d');const H2=c.height=120;c.width=W;x.clearRect(0,0,W,H2);
+ const Y=v=>H2-18-(o.best>0?v/o.best:0)*(H2-30);
+ x.strokeStyle=ink;x.lineWidth=2;x.beginPath();o.sb.forEach((v,i)=>{i?x.lineTo(X(i),Y(v)):x.moveTo(X(i),Y(v))});x.stroke();
+ x.strokeStyle=mut;x.lineWidth=1;x.beginPath();x.moveTo(0,H2-17.5);x.lineTo(W,H2-17.5);x.stroke();
+ x.setLineDash([5,4]);x.beginPath();x.moveTo(X(o.bt),0);x.lineTo(X(o.bt),H2-18);x.stroke();x.setLineDash([]);
+ x.strokeStyle=ink;x.beginPath();x.moveTo(X(t),0);x.lineTo(X(t),H2-18);x.stroke();
+ x.fillStyle=crv;x.beginPath();x.arc(X(t),Y(o.sb[t]),5,0,7);x.fill();
+ otAxes(E.hc.getContext('2d'),512,170,Math.max(...n.h).toLocaleString(),mut);otAxes(E.cc.getContext('2d'),512,120,null,mut);otAxes(E.vc.getContext('2d'),512,120,Math.round(o.best).toLocaleString(),mut);
+ const w0=o.w0[t],w1=1-w0,mu0=o.m0[t],mu1=w1>1e-12?(o.mt-w0*mu0)/w1:0,sb=o.sb[t],f=(v,k=3)=>(+v).toFixed(k);
+ E.stats.innerHTML=[['\\omega_0','class 0 weight',f(w0)],['\\omega_1','class 1 weight',f(w1)],['\\mu_0','class 0 mean',f(mu0,1)],['\\mu_1','class 1 mean',f(mu1,1)],['\\sigma_B^2','between classes',f(sb,1)],['\\sigma_W^2','within classes',f(o.vt-sb,1)],['t^{*}','Otsu optimum',o.bt],['\\sigma_B^2(t^{*})','largest between-class variance',f(o.best,1)]].map(([q,l,v])=>`<div>${tx(q)} <span class='cap'>${l}</span><b>${v}</b></div>`).join('');
+ E.note.innerHTML=`${tx('C_0')} = pixels with gray level up to ${tx('t')} (teal in the histogram); ${tx('C_1')} = pixels above ${tx('t')} (red).<br>Otsu tries all 256 thresholds, so it is a search, not a converging loop: ${tx('\\sigma_B^2(t)=\\omega_0\\,\\omega_1\\,(\\mu_0-\\mu_1)^2')}, and the best ${tx('t')} is the one with the largest value (equivalently, the smallest within-class variance).<br>For comparison, iterative selection (ISODATA) starts at the mean and repeats \u201cnew ${tx('t')} = midpoint of the two class means\u201d: here it starts at ${iso.seen[0]}${iso.it?', then goes '+iso.seen.slice(1).join(', '):''} and stops at <b>${iso.t}</b> after ${iso.it} update${iso.it===1?'':'s'}.`;
+ const pane=s.ot.tab||'num';E.tabs.forEach(([k,b])=>b.setAttribute('aria-pressed',k===pane));E.pn.hidden=pane!=='num';E.der.hidden=pane!=='der';E.h4.textContent=pane==='num'?'Numbers at this threshold':'How the threshold is picked';
+ if(pane==='der'){
+  const mom=w0*mu0,N=n.h.reduce((a,b)=>a+b,0),cnt0=n.h.slice(0,t+1).reduce((a,b)=>a+b,0),
+   ranked=o.sb.map((v,i)=>[i,v]).sort((a,b)=>b[1]-a[1]||a[0]-b[0]).slice(0,6),ties=o.sb.filter(v=>v===o.best).length,
+   sw=c=>`<span style='display:inline-block;width:11px;height:11px;border-radius:3px;background:${c};vertical-align:-1px'></span>`,
+   row=(a,b)=>`<div class='dstep'><span class='dn'>${a}</span><div>${b}</div></div>`;
+  E.der.innerHTML=
+   row(1,`Turn the histogram into probabilities, with ${tx('N='+N)} pixels in total:${tx('p_i=\\frac{n_i}{N}',1)}`)
+  +row(2,`Overall mean and total variance:${tx('\\mu_T=\\sum_{i=0}^{255} i\\,p_i='+f(o.mt,2)+'\\qquad \\sigma_T^2=\\sum_{i=0}^{255}(i-\\mu_T)^2\\,p_i='+f(o.vt,1),1)}`)
+  +row(3,`Pick a threshold, here <b>${tx('t='+t)}</b>. It splits the pixels into two classes according to their gray level:${tx('C_0=\\{\\text{pixels with gray level}\\le t\\}',1)}${tx('C_1=\\{\\text{pixels with gray level}>t\\}',1)}<div>${sw('var(--acc)')} ${tx('C_0')} is the darker class (teal in the histogram) and holds <b>${cnt0}</b> pixels.</div><div style='margin-top:4px'>${sw('var(--curve)')} ${tx('C_1')} is the brighter class (red) and holds <b>${N-cnt0}</b> pixels.</div><div style='margin-top:8px'>Each class weight is the fraction of all pixels it holds:</div>${tx('\\omega_0=\\sum_{i\\le t}p_i=\\frac{|C_0|}{N}=\\frac{'+cnt0+'}{'+N+'}='+f(w0,4),1)}${tx('\\omega_1=\\frac{|C_1|}{N}=1-\\omega_0=\\frac{'+(N-cnt0)+'}{'+N+'}='+f(w1,4),1)}`)
+  +row(4,`Inside class ${tx('C_0')} the probabilities ${tx('p_i')} only add up to ${tx('\\omega_0')}, not to 1:${tx('\\sum_{i\\le t}p_i=\\omega_0='+f(w0,4),1)}To treat class 0 as a distribution of its own we renormalise it: ${tx('P(i\\mid C_0)=\\frac{p_i}{\\omega_0}')}, which now sums to ${tx('\\frac{\\omega_0}{\\omega_0}=1')}. Class 1 is renormalised the same way with ${tx('\\omega_1')}.`)
+  +row(5,`The class mean is the mean of that renormalised distribution. The sum in its numerator is the <i>partial moment</i>, the part of ${tx('\\mu_T')} that comes from the levels up to ${tx('t')}. It is not a mean yet:${tx('\\mu(t)=\\sum_{i\\le t} i\\,p_i='+f(mom,2),1)}${tx('\\mu_0=\\sum_{i\\le t} i\\,P(i\\mid C_0)=\\frac{1}{\\omega_0}\\sum_{i\\le t} i\\,p_i=\\frac{\\mu(t)}{\\omega_0}=\\frac{'+f(mom,2)+'}{'+f(w0,4)+'}='+f(mu0,2),1)}So ${tx('1/\\omega_0')} does not rescale a mean. It turns a partial sum into a mean.`)
+  +row(6,`Class 1 uses the rest of the moment, because the two parts add up to the overall mean:${tx('\\mu(t)+\\sum_{i>t} i\\,p_i=\\mu_T',1)}${tx('\\mu_1=\\frac{1}{\\omega_1}\\sum_{i>t} i\\,p_i=\\frac{\\mu_T-\\mu(t)}{\\omega_1}=\\frac{'+f(o.mt,2)+'-'+f(mom,2)+'}{'+f(w1,4)+'}='+f(mu1,2),1)}As a check, ${tx('\\omega_0\\mu_0+\\omega_1\\mu_1='+f(w0*mu0+w1*mu1,2)+'=\\mu_T')}.`)
+  +row(7,`Between-class variance:${tx('\\sigma_B^2(t)=\\omega_0\\,\\omega_1\\,(\\mu_0-\\mu_1)^2='+f(w0,4)+'\\times'+f(w1,4)+'\\times('+f(mu0,2)+'-'+f(mu1,2)+')^2=\\mathbf{'+f(sb,1)+'}',1)}`)
+  +row(8,`Repeat for every ${tx('t')} from 0 to 255 (that is the curve above) and keep the largest:${tx('t^{*}=\\arg\\max_{0\\le t\\le 255}\\,\\sigma_B^2(t)',1)}The best candidates:<table class='dtab'><tr><th>${tx('t')}</th><th>${tx('\\sigma_B^2')}</th></tr>${ranked.map(([i,v])=>`<tr class='${i===o.bt?'hl':''}${i===t?' cur':''}'><td>${i}</td><td>${f(v,1)}</td></tr>`).join('')}</table>${ties>1?`${ties} thresholds tie for the maximum (the curve is flat there), so Otsu keeps the first one: ${tx('t^{*}='+o.bt)}.`:`The winner is ${tx('t^{*}='+o.bt)}.`}`)
+  +row(9,`Why this works: the total variance does not change with ${tx('t')}:${tx('\\sigma_T^2=\\sigma_W^2+\\sigma_B^2\\quad\\Longrightarrow\\quad '+f(o.vt,1)+'='+f(o.vt-sb,1)+'+'+f(sb,1),1)}so pushing the classes as far apart as possible (large ${tx('\\sigma_B^2')}) is the same as making each class as tight as possible (small ${tx('\\sigma_W^2')}).`)
+  +(t===o.bt?'':`<div class='cap' style='margin-top:8px'>You are looking at ${tx('t='+t)}. The optimum is ${tx('t^{*}='+o.bt)} with ${tx('\\sigma_B^2='+f(o.best,1))}. Press \u201cOtsu optimum\u201d to see its derivation.</div>`);
+ }
+}
+const hooks={render:renderOtsu,paint:()=>paintOtsu()};
+registerTab('otsu',hooks);
+return hooks;
+})();
+
+/* ==== 7. BOOT ========================================================================================= */
+(()=>{
+const{drawSide,render,restore}=Core;
+
+render();
+drawSide();
+restore();
+})();
+</script>
+</body></html>
