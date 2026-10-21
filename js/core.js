@@ -57,13 +57,14 @@ function drawSide(){
  pl.onclick=()=>{const T=TABS[App.tab],s=T.newSession?T.newSession():{pid:uid(),w:0,h:0,rgba:null,empty:true,gray:$('gray').checked,nodes:[{id:0,root:true}]};App.sessions.push(s);App.cur=s;sync()};sd.append(pl);
 }
 function sync(){save();$('pdf').disabled=!App.cur||App.cur.empty;if(App.cur)$('gray').checked=App.cur.gray;render();if(App.cur)update(App.cur);else drawSide()}
-async function addImage(blob){if(TABS[App.tab].noImages)return;
+async function addImage(blob){const T=TABS[App.tab];if(T.noImages)return;
  const bmp=await createImageBitmap(blob),k=Math.min(1,1200/Math.max(bmp.width,bmp.height));
  const w=Math.round(bmp.width*k),h=Math.round(bmp.height*k),c=document.createElement('canvas');c.width=w;c.height=h;
  const x=c.getContext('2d',{willReadFrequently:true});x.drawImage(bmp,0,0,w,h);
  const rgba=x.getImageData(0,0,w,h).data;
- if(App.cur&&App.cur.empty){Object.assign(App.cur,{w,h,rgba,empty:false,gray:$('gray').checked});keep(c,App.cur.pid);sync();return}
- const s={pid:uid(),w,h,rgba,gray:$('gray').checked,nodes:[{id:0,root:true}]};
+ if(App.cur&&App.cur.empty&&!T.adoptImage){Object.assign(App.cur,{w,h,rgba,empty:false,gray:$('gray').checked});keep(c,App.cur.pid);sync();return}
+ let s={pid:uid(),w,h,rgba,gray:$('gray').checked,nodes:[{id:0,root:true}]};
+ if(T.adoptImage)s=T.adoptImage(s);// a tab can turn the new image session into its own kind (the kernels tab does)
  App.sessions.push(s);App.cur=s;keep(c,s.pid);sync();
 }
 document.addEventListener('paste',e=>{const it=[...(e.clipboardData?.items||[])].find(i=>i.type.startsWith('image/'));if(it){e.preventDefault();addImage(it.getAsFile())}});
@@ -143,7 +144,7 @@ async function loadTab(d){
   const s={pid:r.pid,w:r.w,h:r.h,gray:r.gray,empty:!!r.empty,rgba:null,nodes:r.nodes||[],k:r.k||undefined,ot:r.ot||undefined};
   if(r.bits)s.bits={src:r.bits.src,sel:new Set(r.bits.sel),norm:r.bits.norm};
   r.nodes.forEach(n=>{mx=Math.max(mx,n.id)});
-  if(!s.empty&&!s.k){
+  if(!s.empty&&(!s.k||s.k.src==='image')){// image sessions (incl. the kernels tab's) reload their pixels from IndexedDB
    try{const blob=await idbGet(s.pid);if(!blob)continue;const bmp=await createImageBitmap(blob);
     const c=document.createElement('canvas');c.width=bmp.width;c.height=bmp.height;
     const x=c.getContext('2d',{willReadFrequently:true});x.drawImage(bmp,0,0);
@@ -167,7 +168,7 @@ async function restore(){
 $('main').addEventListener('click',e=>{if(e.target.closest('.empty'))$('file').click()});
 $('main').addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.classList.contains('empty')){e.preventDefault();$('file').click()}});
 function hSnap(s){if(!s)return null;
- return s.k?JSON.stringify({k:s.k},(key,val)=>(key==='done'||key==='sig'||key==='pos'||key==='placed'||key==='tw'||key==='tn')?undefined:val)
+ return s.k?JSON.stringify({k:s.k},(key,val)=>(key==='done'||key==='sig'||key==='pos'||key==='placed'||key==='tw'||key==='tn'||key==='applied')?undefined:val)
   :JSON.stringify({ot:s.ot||null,gray:s.gray,nodes:s.nodes.map(n=>({id:n.id,parent:n.parent,type:n.type,v:n.v,root:n.root})),bits:s.bits?{src:s.bits.src,sel:[...s.bits.sel],norm:s.bits.norm}:null})}
 function hBtns(){const s=App.cur;$('undo').disabled=!(s&&s.hs&&s.hs.u.length);$('redo').disabled=!(s&&s.hs&&s.hs.r.length)}
 function hTick(){const s=App.cur;if(!s)return;const sn=hSnap(s);
@@ -175,7 +176,7 @@ function hTick(){const s=App.cur;if(!s)return;const sn=hSnap(s);
  else if(sn!==s.hs.last){s.hs.u.push(s.hs.last);if(s.hs.u.length>100)s.hs.u.shift();s.hs.r=[];s.hs.last=sn}
  hBtns()}
 function hApply(s,snap){const d=JSON.parse(snap);
- if(s.k){const nk=d.k;(nk.steps||[]).forEach((st,i)=>{const o=s.k.steps&&s.k.steps[i];st.pos=o?o.pos:[0,0];st.placed=o?o.placed:false;st.done=[];st.sig=''});s.k=nk}
+ if(s.k){const nk=d.k;(nk.steps||[]).forEach((st,i)=>{const o=s.k.steps&&s.k.steps[i];st.pos=o?o.pos:[0,0];st.placed=o?o.placed:false;st.done=[];st.sig='';if(o&&o.applied)st.applied=o.applied});s.k=nk}
  else{s.ot=d.ot||undefined;s.gray=d.gray;s.nodes=d.nodes;s.bits=d.bits?{src:d.bits.src,sel:new Set(d.bits.sel),norm:d.bits.norm}:undefined}
  sync();s.hs.last=hSnap(s)}
 function hUndo(){hTick();const s=App.cur;if(!s||!s.hs||!s.hs.u.length)return;const p=s.hs.u.pop();s.hs.r.push(s.hs.last);hApply(s,p);hBtns()}
@@ -188,6 +189,6 @@ document.addEventListener('keydown',e=>{const t=e.target,txt=t.tagName==='TEXTAR
  if(txt||!(e.ctrlKey||e.metaKey))return;const k=e.key.toLowerCase();
  if(k==='z'&&!e.shiftKey){e.preventDefault();hUndo()}else if(k==='y'||(k==='z'&&e.shiftKey)){e.preventDefault();hRedo()}});
 document.addEventListener('click',()=>document.querySelectorAll('.menu').forEach(z=>z.hidden=true));
-return{$,addImage,clean,drawSide,emptyState,exportSessionPdf,IC,imgUrl,mk,nodeName,paintHist,paintImg,printHist,registerTab,
+return{$,addImage,clean,compute,drawSide,emptyState,exportSessionPdf,IC,imgUrl,mk,nodeName,paintHist,paintImg,printHist,registerTab,
  render,restore,save,sync,uid,update};
 })();

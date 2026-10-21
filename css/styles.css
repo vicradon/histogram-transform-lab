@@ -104,6 +104,13 @@ canvas.kcv{background:transparent;border-color:transparent}
 .kph{flex-basis:100%;font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--acc);margin:0 0 4px}
 .kg{display:flex;flex-direction:column;gap:3px}
 .kgl{font-size:11px;color:var(--mut)}
+.kimg{display:block;width:100%;max-width:520px;height:auto;background:#000;cursor:crosshair}
+.kimg.stale{opacity:.4}
+.kfoot{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-top:10px}
+.kerr{color:var(--curve)}
+.kprobe{display:block;min-height:1.5em;margin-top:4px;font-variant-numeric:tabular-nums}
+button.primary{background:var(--acc);color:var(--bg);border-color:var(--acc);font-weight:600}
+button.primary:disabled{opacity:.5;cursor:not-allowed}
 /* ==== Otsu tab ==== */
 body[data-tab=otsu] #pdf{display:none}
 .ostat{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin:8px 0}

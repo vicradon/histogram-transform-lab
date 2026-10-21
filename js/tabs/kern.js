@@ -8,6 +8,10 @@ const KOPS=[['erode','Erosion'],['dilate','Dilation'],['hm','Hit-or-miss'],['alg
 let kE=null;
 // transient kernels-tab UI state (never saved): active step, selected shapes, shape being drawn, whether a drag is in progress
 const kui={act:0,sel:new Set(),draft:null,dragging:false};
+// Whole-image mode (js/tabs/kern-image.js) plugs in here; sessions made from an image have k.src === 'image'.
+let imageMode=null;
+const isImg=s=>!!(s&&s.k&&s.k.src==='image');
+function setImageMode(m){imageMode=m}
 function newKern(){return{pid:uid(),w:0,h:0,rgba:null,gray:true,nodes:[],k:{shapes:[],nx:1,ng:1,view:'drawing',op:'erode',conn:8,tool:'rect',fill:true,K:KP[1][1].map(r=>r.slice()),pos:[0,0]}}}
 function kCell(G,x,i,fill,txt,tc){const{C:KC,W:KW}=G;const X=(i%KW)*KC,Y=((i/KW)|0)*KC;x.fillStyle=fill;x.fillRect(X,Y,KC,KC);x.strokeStyle='#cfcfcf';x.lineWidth=1;x.strokeRect(X+.5,Y+.5,KC-1,KC-1);
  if(txt!==''){x.fillStyle=tc;x.fillText(txt,X+KC/2,Y+KC/2+1)}}
@@ -38,7 +42,7 @@ function kCur(t){if(KCUR[t])return KCUR[t];
   g={rect:`<rect x='13' y='14' width='10' height='7' ${st}/>`,ellipse:`<ellipse cx='18' cy='17.5' rx='5' ry='4' ${st}/>`,diamond:`<path d='M18 12l5 5.5-5 5.5-5-5.5z' ${st}/>`,free:`<path d='M12 22c2-7 3 2 5-3s3 0 5-4' ${st}/>`}[t]||'',
   svg=`<svg xmlns='http://www.w3.org/2000/svg' width='26' height='26'><path d='M7 1v12M1 7h12' stroke='white' stroke-width='3.2'/><path d='M7 1v12M1 7h12' stroke='black' stroke-width='1.2'/>${g}</svg>`;
  return KCUR[t]=`url("data:image/svg+xml,${encodeURIComponent(svg)}") 7 7, crosshair`}
-document.addEventListener('keydown',e=>{if(App.tab!=='kern'||!App.cur||!App.cur.k||/INPUT|SELECT|TEXTAREA/.test(e.target.tagName))return;
+document.addEventListener('keydown',e=>{if(App.tab!=='kern'||!App.cur||!App.cur.k||isImg(App.cur)||/INPUT|SELECT|TEXTAREA/.test(e.target.tagName))return;
  const d={ArrowRight:'r',ArrowLeft:'l',ArrowUp:'u',ArrowDown:'d'}[e.key];if(d){e.preventDefault();kMove(d);return}
  if(e.ctrlKey||e.metaKey||e.altKey)return;
  const T={v:'select',r:'rect',o:'ellipse',d:'diamond',l:'free',p:'paint'}[e.key.toLowerCase()];
@@ -55,8 +59,9 @@ function kThumb(c,s){kMig(s.k);const G=kGrid(s.k);c.width=G.W;c.height=G.H;const
 function renderKern(){
  const m=$('main');m.innerHTML='';kE=null;kui.sel.clear();
  if(!App.cur){App.cur=newKern();App.sessions.push(App.cur)}
+ if(isImg(App.cur))return imageMode.render();
  const k=App.cur.k;kMig(k);const E=kE={steps:[]};
- const c1=mk('section','card');c1.append(mk('h2','','Drawing tools'));
+ const c1=mk('section','card');c1.append(mk('h2','','Drawing tools'),mk('div','cap','Draw a small binary image and step a kernel across it. To run the same operations on a whole picture, paste, drop or open an image here.'));
  const r1=mk('div','row'),tl=mk('div','chips');E.tools={};
  [...KT,['paint','Paint 1s (Shift or right-drag erases)','P',KI.paint]].forEach(([t,l,key,ic])=>{const b=mk('button','chip ibtn',IC(ic));b.title=`${l} (${key})`;b.setAttribute('aria-label',l);b.onclick=()=>{k.tool=t;if(t!=='paint')k.view='drawing';kPaint()};E.tools[t]=b;tl.append(b)});
  const fl=mk('label','sw',"<input type='checkbox'> Fill shapes");E.fill=fl.firstChild;
@@ -130,30 +135,23 @@ const KOP_LABELS=['Erosion','Dilation','Hit-or-miss','Algebra','Weighted min/max
 const KALG_SYMS=[['A','A (the input image)'],['B','B (the structuring element)'],['⊖','erosion'],['⊕','dilation'],['∘','opening'],['•','closing'],['∩','intersection (and)'],['∪','union (or)'],['−','difference'],['ᶜ','complement'],['(','('],[')',')']];
 const KALG_EXAMPLES=[['Boundary','A − (A ⊖ B)'],['Outer boundary','(A ⊕ B) − A'],['Gradient','(A ⊕ B) − (A ⊖ B)'],['Opening','(A ⊖ B) ⊕ B'],['Closing','(A ⊕ B) ⊖ B'],['Top-hat','A − ((A ⊖ B) ⊕ B)']];
 const KARROWS={l:['Left','M19 12H5M11 6l-6 6 6 6'],u:['Up','M12 19V5M6 11l6-6 6 6'],d:['Down','M12 5v14M6 13l6 6 6-6'],r:['Right','M5 12h14M13 6l6 6-6 6']};
-function kStepCard(E,k,st,i){
- kFixWt(st);if(st.expr==null)st.expr='A − (A ⊖ B)';if(!st.Tedit)st.Tedit={};
- const Es={segs:[]};E.steps[i]=Es;let G=kGrid(k);// refreshed in cell() and setPos(): the grid can be resized while this card is on screen
- const c=mk('section','card'),go=()=>{kui.act=i;kPaint()},row=css=>{const r=mk('div','row');if(css)r.style.cssText=css;return r};
+// Small DOM helpers for step cards. seg() also registers the control's refresh function in Es.segs.
+function kHelpers(Es){
+  const row=css=>{const r=mk('div','row');if(css)r.style.cssText=css;return r};
  const btn=(l,f,cls)=>{const b=mk('button',cls||'',l);b.onclick=f;return b};
  const sel=(opts)=>{const s=mk('select');s.innerHTML=opts.map(([v,l])=>`<option value='${v}'>${l}</option>`).join('');return s};
  const seg=(s,labels)=>{const g=kSeg(s,labels);Es.segs.push(g.upd);return g};
  const grp=(lab,el)=>{const g=mk('div','kg');g.append(mk('div','kgl',lab),el);return g};
  const dragSrc=(el,key)=>{el.draggable=true;el.ondragstart=ev=>ev.dataTransfer.setData('text/plain','kern:'+key)};
- const cell=e=>{kMig(k);G=kGrid(k);const{W:KW,H:KH}=G,r=Es.main.getBoundingClientRect(),m=Es.m||0;return[kCl(Math.floor((e.clientX-r.left)/r.width*(KW+2*m))-m,0,KW-1),kCl(Math.floor((e.clientY-r.top)/r.height*(KH+2*m))-m,0,KH-1)]};
-
- // header
- const h=mk('h2','',`Step ${i+1}${i?' (input = result of step '+i+')':''}`);
- if(i>0)h.append(mk('span','sp'),btn('Remove this step',()=>{k.steps.length=i;kui.act=Math.min(kui.act,i-1);renderKern();kPaint()}));
-
- // operation picker and scan controls
+ return{row,btn,sel,seg,grp,dragSrc}}
+// The operation picker (Es.op, Es.opSeg) and the four parameter panels: algebra (Es.alg), labeling (Es.lab),
+// structuring element (Es.r2) and weighted kernel (Es.wt). Shared by the grid and the image step cards.
+// go() marks this step active and repaints.
+function kPanels(Es,st,i,go){
+ const{row,btn,sel,seg,grp,dragSrc}=kHelpers(Es);
  Es.op=sel(KOPS);Es.op.onchange=()=>{st.op=Es.op.value;go()};
  Es.conn=sel([[4,'V4 connectivity'],[8,'V8 connectivity']]);Es.conn.onchange=()=>{st.conn=+Es.conn.value;go()};// lives in the labeling panel as a segmented control
- const ar=mk('div','chips');
- Object.entries(KARROWS).forEach(([d,[name,path]])=>{const b=btn(IC(`<path d='${path}'/>`),()=>kMove(d,i),'ibtn');b.title=name+' (arrow key)';b.setAttribute('aria-label',name);ar.append(b)});
- const setPos=f=>()=>{kFixWt(st);G=kGrid(k);st.pos=f();st.placed=true;kui.act=i;if(st.op==='label')st.tw=st.pos[1]*G.W+st.pos[0]===G.W*G.H-1?(st.tn||0):0;kPaint()};
- ar.append(btn('Start',setPos(()=>st.op==='wt'?kSP(G,st,0):[0,0])),btn('End',setPos(()=>st.op==='wt'?kSP(G,st,G.W*G.H-1):[G.W-1,G.H-1])),btn('Remove kernel',()=>{st.placed=false;go()}));
- Es.pos=mk('span','cap');
- const rOp=row();rOp.append(Es.op,seg(Es.op,KOP_LABELS).el,ar,Es.pos);
+ Es.opSeg=seg(Es.op,KOP_LABELS).el;
 
  // panel: algebra expression
  Es.alg=mk('div','kpanel');
@@ -195,10 +193,29 @@ function kStepCard(E,k,st,i){
  Es.wed=mk('div','ked');
  const g1=seg(Es.red,['Minimum','Maximum']),g2=seg(Es.dx,['Left to right','Right to left']),g3=seg(Es.dy,['Top to bottom','Bottom to top']),g4=seg(Es.wsz,['3 x 3','5 x 5']);
  Es.segs.push(()=>[...sq.children].forEach((b,n)=>b.setAttribute('aria-pressed',(n===0)===!!st.seq)));
- const dg=mk('div','cap','Drag this kernel onto the image');dragSrc(dg,'s'+i);dg.style.cssText='cursor:grab;border:1px dashed var(--line);border-radius:6px;padding:4px 8px;width:max-content';
+ const dg=Es.wtDrag=mk('div','cap','Drag this kernel onto the image');dragSrc(dg,'s'+i);dg.style.cssText='cursor:grab;border:1px dashed var(--line);border-radius:6px;padding:4px 8px;width:max-content';
  const ctl=mk('div','col');
  ctl.append(mk('div','cap','Each cell is a weight added to the pixel under it. ∞ = unused cell (type inf or ∞).'),grp('Combine neighbors by',g1.el),grp('Scan columns',g2.el),grp('Scan rows',g3.el),grp('Each cell reads',sq),grp('Size',g4.el),dg,Es.wed,Es.red,Es.dx,Es.dy,Es.wsz);
  Es.wt.append(mk('div','kph','Kernel programming'),Es.act2,pw,ctl);kWSync(Es,st);
+}
+function kStepCard(E,k,st,i){
+ kFixWt(st);if(st.expr==null)st.expr='A − (A ⊖ B)';if(!st.Tedit)st.Tedit={};
+ const Es={segs:[]};E.steps[i]=Es;let G=kGrid(k);// refreshed in cell() and setPos(): the grid can be resized while this card is on screen
+ const c=mk('section','card'),go=()=>{kui.act=i;kPaint()},{row,btn}=kHelpers(Es);
+ const cell=e=>{kMig(k);G=kGrid(k);const{W:KW,H:KH}=G,r=Es.main.getBoundingClientRect(),m=Es.m||0;return[kCl(Math.floor((e.clientX-r.left)/r.width*(KW+2*m))-m,0,KW-1),kCl(Math.floor((e.clientY-r.top)/r.height*(KH+2*m))-m,0,KH-1)]};
+
+ // header
+ const h=mk('h2','',`Step ${i+1}${i?' (input = result of step '+i+')':''}`);
+ if(i>0)h.append(mk('span','sp'),btn('Remove this step',()=>{k.steps.length=i;kui.act=Math.min(kui.act,i-1);renderKern();kPaint()}));
+
+ // operation picker and scan controls
+ kPanels(Es,st,i,go);
+ const ar=mk('div','chips');
+ Object.entries(KARROWS).forEach(([d,[name,path]])=>{const b=btn(IC(`<path d='${path}'/>`),()=>kMove(d,i),'ibtn');b.title=name+' (arrow key)';b.setAttribute('aria-label',name);ar.append(b)});
+ const setPos=f=>()=>{kFixWt(st);G=kGrid(k);st.pos=f();st.placed=true;kui.act=i;if(st.op==='label')st.tw=st.pos[1]*G.W+st.pos[0]===G.W*G.H-1?(st.tn||0):0;kPaint()};
+ ar.append(btn('Start',setPos(()=>st.op==='wt'?kSP(G,st,0):[0,0])),btn('End',setPos(()=>st.op==='wt'?kSP(G,st,G.W*G.H-1):[G.W-1,G.H-1])),btn('Remove kernel',()=>{st.placed=false;go()}));
+ Es.pos=mk('span','cap');
+ const rOp=row();rOp.append(Es.op,Es.opSeg,ar,Es.pos);
 
  // input grid (left) and result grid (right)
  const rIo=row('margin-top: 10px; align-items: flex-end;'),a=mk('div','kcol'),b=mk('div','kcol');
@@ -283,6 +300,7 @@ const KRUN={
   return{full,part:full,lim:st.placed?idx:-1}}};
 function kLabMsg(Es,msg,ok){Es.lmsg.textContent=msg;Es.lmsg.style.color=ok?'var(--mut)':'var(--curve)'}
 function kPaint(){
+ if(isImg(App.cur)){if(App.tab==='kern')imageMode.paint();return}
  const s=App.cur,E=kE;if(!s||!s.k||!E||App.tab!=='kern')return;save();
  const k=s.k;kMig(k);const G=kGrid(k),{W:KW,H:KH}=G;const css=getComputedStyle(document.documentElement),col={acc:css.getPropertyValue('--acc').trim(),crv:css.getPropertyValue('--curve').trim()};
  E.fill.checked=k.fill;E.gw.value=k.W;E.gh.value=k.H;E.in1.value=k.in1s||'1';E.in0.value=k.in0s||'0';E.clr.hidden=!k.num;E.tbl=null;
@@ -324,19 +342,15 @@ function kDrawResult(G,Es,st,r,input,{acc}){const{C:KC,W:KW}=G;
  else r.full.forEach((v,j)=>{if(!st.done[j])kCell(G,x,j,'#ececec','','');else kCell(G,x,j,v?'#222':'#fff',v,v?'#fff':'#999')});
  if(st.op==='label'&&Es.twl){x.save();x.strokeStyle='#000';x.lineWidth=3;r.part.forEach((v,j)=>{if(v===Es.twl)x.strokeRect((j%KW)*KC+2,((j/KW)|0)*KC+2,KC-4,KC-4)});x.restore()}
  if(st.placed){x.strokeStyle=acc;x.lineWidth=3;x.strokeRect(st.pos[0]*KC+1.5,st.pos[1]*KC+1.5,KC-3,KC-3)}}
-function kSyncStep(G,Es,E,k,st,i,r,input,idx,{acc,crv}){const{H:KH,W:KW}=G;
- const op=st.op,wt=op==='wt',isLab=op==='label'||op==='apply';
- // correspondence table panel
- if(op==='label'){if(Es.wasDone!==undefined&&Es.tdone&&!Es.wasDone){Es.tbx.classList.remove('pulse');void Es.tbx.offsetWidth;Es.tbx.classList.add('pulse')}Es.wasDone=!!Es.tdone}
- if(op==='apply'&&E.tbl){Es.tbx.hidden=false;Es.tbxCap.textContent='Upgraded table T (read-only reference): the outlined entry is the one the box is using';Es.tbxReset.hidden=true;kTableRO(Es,E.tbl,st.placed?input[idx]:0)}
- else if(op==='label'){Es.tbxCap.textContent='Correspondence table T (editable; teal ring = changed, dark outline = entry being upgraded, red = edited by you)';Es.tbxReset.hidden=false;Es.tcells.style.opacity='';Es.tbx.hidden=false;kTable2(Es,st,r.tblPart||[0],Es.tprev,Es.twl,Es.told)}
- else Es.tbx.hidden=true;
- // which panels are visible
+// Panel visibility, help texts, segmented controls and preset highlighting. image = whole-image mode texts.
+const KLAB_IMG={label:'Sequential labeling: one raster pass gives provisional labels and the correspondence table T; add a "Relabel through table" step to resolve them',
+ apply:'Relabel through the table: every pixel takes its final label from the table built by the labeling step above'};
+function kSyncPanels(Es,st,image){const op=st.op,wt=op==='wt',isLab=op==='label'||op==='apply';
  Es.op.value=op;Es.r2.hidden=wt||isLab;Es.wt.hidden=!wt;Es.alg.hidden=op!=='alg';Es.lab.hidden=!isLab;Es.sc.el.hidden=op!=='label';Es.conn.value=st.conn;
- Es.lh.textContent={label:'Labeling pass, then table upgrade: scan the image with the arrows; once it is complete, keep stepping right to upgrade the table entry by entry',apply:'Relabel through the table: move the box over the pixels; each pixel takes its value from the upgraded table'}[op]||'';
+ Es.lh.textContent=image?(KLAB_IMG[op]||''):({label:'Labeling pass, then table upgrade: scan the image with the arrows; once it is complete, keep stepping right to upgrade the table entry by entry',apply:'Relabel through the table: move the box over the pixels; each pixel takes its value from the upgraded table'}[op]||'');
  if(Es.lastOp!==op){Es.lastOp=op;kEd(Es,st);
-  Es.kh1.textContent={erode:'Structuring element - erosion keeps a pixel only if every teal cell lies on foreground',dilate:'Structuring element - dilation sets a pixel if any teal cell touches foreground',hm:'Hit-or-miss pattern',alg:'B = structuring element'}[op]||'';
-  Es.kedHelp.textContent=op==='hm'?'Drag the kernel onto the image. Click a cell to cycle teal 1 (foreground), red 0 (background), dashed (ignored).':'Drag the kernel onto the image. Click a cell to switch it on (teal) or off (dashed).'}
+  Es.kh1.textContent=image?({erode:'Structuring element: erosion takes the minimum of the pixels under the teal cells',dilate:'Structuring element: dilation takes the maximum of the pixels under the reflected element',hm:'Hit-or-miss pattern',alg:'B = structuring element'}[op]||''):{erode:'Structuring element - erosion keeps a pixel only if every teal cell lies on foreground',dilate:'Structuring element - dilation sets a pixel if any teal cell touches foreground',hm:'Hit-or-miss pattern',alg:'B = structuring element'}[op]||'';
+  Es.kedHelp.textContent=(image?'':'Drag the kernel onto the image. ')+(op==='hm'?'Click a cell to cycle teal 1 (foreground), red 0 (background), dashed (ignored).':'Click a cell to switch it on (teal) or off (dashed).')}
  Es.segs.forEach(f=>f());
  // highlight the preset that matches the current kernel
  const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b),bi=KP.findIndex(([,M])=>same(M,st.K)),wi=KPW.findIndex(([,Wt,dx,dy])=>same(Wt,st.Wt)&&dx===st.dx&&dy===st.dy&&st.red==='min');
@@ -344,6 +358,15 @@ function kSyncStep(G,Es,E,k,st,i,r,input,idx,{acc,crv}){const{H:KH,W:KW}=G;
  [...Es.wt.querySelectorAll('button.km')].forEach((b,pi)=>b.setAttribute('aria-pressed',pi===wi));
  Es.act1.innerHTML=`Active: <b>${bi>=0?KP[bi][0]:'Custom'}</b> (${st.K.length} x ${st.K.length})`;
  Es.act2.innerHTML=`Active: <b>${wi>=0?KPW[wi][0]:'Custom'}</b> (${st.Wt.length} x ${st.Wt.length})`;
+}
+function kSyncStep(G,Es,E,k,st,i,r,input,idx,{acc,crv}){const{H:KH,W:KW}=G;
+ const op=st.op,wt=op==='wt';
+ // correspondence table panel
+ if(op==='label'){if(Es.wasDone!==undefined&&Es.tdone&&!Es.wasDone){Es.tbx.classList.remove('pulse');void Es.tbx.offsetWidth;Es.tbx.classList.add('pulse')}Es.wasDone=!!Es.tdone}
+ if(op==='apply'&&E.tbl){Es.tbx.hidden=false;Es.tbxCap.textContent='Upgraded table T (read-only reference): the outlined entry is the one the box is using';Es.tbxReset.hidden=true;kTableRO(Es,E.tbl,st.placed?input[idx]:0)}
+ else if(op==='label'){Es.tbxCap.textContent='Correspondence table T (editable; teal ring = changed, dark outline = entry being upgraded, red = edited by you)';Es.tbxReset.hidden=false;Es.tcells.style.opacity='';Es.tbx.hidden=false;kTable2(Es,st,r.tblPart||[0],Es.tprev,Es.twl,Es.told)}
+ else Es.tbx.hidden=true;
+ kSyncPanels(Es,st,false);
  // status line
  Es.pos.textContent=
   op==='apply'?(st.placed?`Box at (${st.pos[0]}, ${st.pos[1]}), pixel ${idx+1} of ${KW*KH}. Each pixel takes its value from the table.`:'Click a pixel in the input grid to place the box, then step with the arrows. The image is relabeled as the box moves.')
@@ -386,7 +409,8 @@ function kM(st){return st.op==='wt'?(st.Wt||[[0]]).length>>1:st.op==='label'?1:s
 function prepM(G,c,m){const{C:KC,H:KH,W:KW}=G;const W=KW*KC,H=KH*KC;c.width=W+2*m*KC;c.height=H+2*m*KC;const x=c.getContext('2d');
  x.clearRect(0,0,c.width,c.height);x.font=KC*.4+'px monospace';x.textAlign='center';x.textBaseline='middle';
  x.fillStyle='#fff';x.fillRect(m*KC,m*KC,W,H);x.strokeStyle='#8a8f96';x.lineWidth=1;x.strokeRect(m*KC-.5,m*KC-.5,W+1,H+1);x.translate(m*KC,m*KC);return x}
-const hooks={render:renderKern,paint:()=>kPaint(),thumb:kThumb,newSession:newKern,noImages:true};
+const hooks={render:renderKern,paint:()=>kPaint(),thumb:(c,s)=>isImg(s)?imageMode.thumb(c,s):kThumb(c,s),newSession:newKern,adoptImage:s=>imageMode.adoptImage(s)};
 registerTab('kern',hooks);
-return{...hooks,KP,KPW};
+// shared: what the whole-image mode reuses from the grid mode
+return{...hooks,KP,KPW,setImageMode,shared:{KP,KOPS,KOP_LABELS,kFixWt,kHelpers,kInf,kPanels,kSyncPanels}};
 })();

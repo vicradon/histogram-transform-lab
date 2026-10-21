@@ -76,15 +76,19 @@ function kwt(G,inp,st,lim){const{H:KH,W:KW}=G;const n=st.Wt.length,r=n>>1,mn=st.
   for(let j=0;j<n;j++)for(let i=0;i<n;i++){const w=st.Wt[j][i];if(w==null)continue;const xx=x+i-r,yy=y+j-r;if(!kIn(G,xx,yy))continue;const v=src[yy*KW+xx]+w;if(best===null||(mn?v<best:v>best))best=v}
   if(best!==null)o[y*KW+x]=best}
  return o}
-function kalg(G,src,A,K){
+// Morphological algebra over A (the input) and B (the structuring element K).
+// ops supplies the image operators; the default is the binary 0/1 set used on drawn grids.
+function kBinOps(G,K){return{e:g=>kmorph(G,g,K,'e'),d:g=>kmorph(G,g,K,'d'),comp:a=>a.map(x=>x?0:1),
+ and:(a,b)=>a.map((x,i)=>x&&b[i]?1:0),or:(a,b)=>a.map((x,i)=>x||b[i]?1:0),minus:(a,b)=>a.map((x,i)=>x&&!b[i]?1:0)}}
+function kalg(G,src,A,K,ops=kBinOps(G,K)){
  const S='AB()\u2296\u2295\u2218\u2022\u2229\u222a\u2212\u1d9c',tk=[...src.replace(/\s+/g,'')].map(c=>/[ab]/i.test(c)?c.toUpperCase():c);let p=0;
  const E=m=>{throw new Error(m)};
  const atom=()=>{const c=tk[p];if(c==='A'){p++;return{img:A}}if(c==='B'){p++;return{se:1}}if(c==='('){p++;const v=expr();if(tk[p]!==')')E('missing )');p++;return v}E(c?'unexpected '+c:'the expression ends too early')};
- const post=()=>{let v=atom();while(tk[p]==='\u1d9c'){p++;if(!v.img)E('complement needs an image');v={img:v.img.map(x=>x?0:1)}}return v};
+ const post=()=>{let v=atom();while(tk[p]==='\u1d9c'){p++;if(!v.img)E('complement needs an image');v={img:ops.comp(v.img)}}return v};
  const mor=()=>{let v=post();while('\u2296\u2295\u2218\u2022'.includes(tk[p]||'#')){const o=tk[p++],r=post();if(!v.img)E('left of '+o+' must be an image');if(!r.se)E('right of '+o+' must be B');
-  v={img:o==='\u2296'?kmorph(G,v.img,K,'e'):o==='\u2295'?kmorph(G,v.img,K,'d'):o==='\u2218'?kmorph(G,kmorph(G,v.img,K,'e'),K,'d'):kmorph(G,kmorph(G,v.img,K,'d'),K,'e')}}return v};
- const term=()=>{let v=mor();while(tk[p]==='\u2229'){p++;const r=mor();if(!v.img||!r.img)E('\u2229 needs two images');v={img:v.img.map((x,i)=>x&&r.img[i]?1:0)}}return v};
- const expr=()=>{let v=term();while(tk[p]==='\u222a'||tk[p]==='\u2212'){const o=tk[p++],r=term();if(!v.img||!r.img)E(o+' needs two images');v={img:v.img.map((x,i)=>o==='\u222a'?(x||r.img[i]?1:0):(x&&!r.img[i]?1:0))}}return v};
+  v={img:o==='\u2296'?ops.e(v.img):o==='\u2295'?ops.d(v.img):o==='\u2218'?ops.d(ops.e(v.img)):ops.e(ops.d(v.img))}}return v};
+ const term=()=>{let v=mor();while(tk[p]==='\u2229'){p++;const r=mor();if(!v.img||!r.img)E('\u2229 needs two images');v={img:ops.and(v.img,r.img)}}return v};
+ const expr=()=>{let v=term();while(tk[p]==='\u222a'||tk[p]==='\u2212'){const o=tk[p++],r=term();if(!v.img||!r.img)E(o+' needs two images');v={img:o==='\u222a'?ops.or(v.img,r.img):ops.minus(v.img,r.img)}}return v};
  try{for(const c of tk)if(!S.includes(c))E('unknown symbol '+c);if(!tk.length)E('type an expression');const v=expr();if(p<tk.length)E('unexpected '+tk[p]);if(!v.img)E('the result must be an image, not B');return{v:v.img}}catch(e){return{err:e.message}}}
 function klab(G,inp,st,lim){const{H:KH,W:KW}=G;const N=KW*KH,E=new Float64Array(N),T=[0],pre=st.conn===8?[[-1,0],[0,-1],[-1,-1],[1,-1]]:[[-1,0],[0,-1]],lm=lim==null?N-1:lim;let k=1;
  for(let t=0;t<=lm&&t<N;t++){const x=t%KW,y=(t/KW)|0;if(!inp[t])continue;const P=[];
@@ -92,6 +96,32 @@ function klab(G,inp,st,lim){const{H:KH,W:KW}=G;const N=KW*KH,E=new Float64Array(
   if(!P.length){E[t]=k;T[k]=k;k++}
   else{const e=Math.min(...P.map(l=>T[l]));E[t]=e;for(let mu of P){let g=0;while(T[mu]!==e&&g++<999){const m=T[mu];T[mu]=e;mu=m}}}}
  return{E,T,k}}
+// ---- Whole-image morphology: real-valued pixels, flat structuring element K (cells equal to 1 belong to it).
+// Grayscale erosion is the minimum under the element, dilation the maximum under its reflection.
+// pad 'zero': pixels outside the image count as 0 (the drawn-grid convention); 'ignore': they are left out.
+// On a 0/1 image with pad 'zero' these return exactly what kmorph / khm return.
+function imgMorph(G,f,K,mode,pad){const{W,H}=G,n=K.length,r=n>>1,ero=mode==='e',zero=pad!=='ignore',dx=[],dy=[];
+ for(let j=0;j<n;j++)for(let i=0;i<n;i++)if(K[j][i]===1){dx.push(ero?i-r:r-i);dy.push(ero?j-r:r-j)}
+ const o=new Float64Array(W*H),m=dx.length;if(!m)return o;
+ for(let y=0;y<H;y++)for(let x=0;x<W;x++){let acc=ero?Infinity:-Infinity,seen=false;
+  for(let q=0;q<m;q++){const xx=x+dx[q],yy=y+dy[q];let v;
+   if(xx<0||yy<0||xx>=W||yy>=H){if(!zero)continue;v=0}else v=f[yy*W+xx];
+   seen=true;if(ero?v<acc:v>acc)acc=v}
+  o[y*W+x]=seen?acc:0}
+ return o}
+// Hit-or-miss on a 0/1 image: 1 where every cell of K that is 0 or 1 matches the pixel under it.
+function imgHm(G,f,K,pad){const{W,H}=G,n=K.length,r=n>>1,zero=pad!=='ignore',o=new Float64Array(W*H);
+ for(let y=0;y<H;y++)for(let x=0;x<W;x++){let ok=true,cnt=0;
+  for(let j=0;j<n&&ok;j++)for(let i=0;i<n;i++){const c=K[j][i];if(c<0)continue;const xx=x+i-r,yy=y+j-r;let v;
+   if(xx<0||yy<0||xx>=W||yy>=H){if(!zero)continue;v=0}else v=f[yy*W+xx]>0?1:0;
+   cnt++;if(v!==c){ok=false;break}}
+  o[y*W+x]=ok&&cnt?1:0}
+ return o}
+// Operators for kalg on images: intersection = min, union = max, difference = max(0, a - b),
+// complement = vmax - a (vmax is 1 for 0/1 images, 255 for grayscale). On 0/1 images these equal kBinOps.
+function imgOps(G,K,vmax,pad){const map2=(a,b,f)=>{const o=new Float64Array(a.length);for(let i=0;i<a.length;i++)o[i]=f(a[i],b[i]);return o};
+ return{e:g=>imgMorph(G,g,K,'e',pad),d:g=>imgMorph(G,g,K,'d',pad),comp:a=>Float64Array.from(a,x=>vmax-x),
+  and:(a,b)=>map2(a,b,Math.min),or:(a,b)=>map2(a,b,Math.max),minus:(a,b)=>map2(a,b,(x,y)=>{const d=x-y;return d>0?d:0})}}
 // Each op turns this step's input into {full, part, lim, tblOut, tblPart}.
 // full = whole result, part = result revealed so far (sequential ops), lim = last scanned index.
 const kBin=input=>Uint8Array.from(input,v=>v>0?1:0);
@@ -105,6 +135,6 @@ function otsuCalc(h){const N=h.reduce((a,b)=>a+b,0)||1,p=Array.from(h,v=>v/N);le
 function isodata(o){let t=Math.round(o.mt),it=0;const seen=[t];
  while(it<100){const w=o.w0[t],m0=o.m0[t],m1=w<1-1e-12?(o.mt-w*m0)/(1-w):m0,nt=Math.round((m0+m1)/2);if(nt===t)break;t=nt;it++;seen.push(t)}
  return{t,it,seen}}
-return{applyLut,bitLut,cdfOf,gv,hist,isodata,kalg,kBin,kbox,kcells,kCl,kEff,kFlat,kFmt,kGrid,khm,kimg,kIn,klab,kmorph,
+return{applyLut,bitLut,cdfOf,gv,hist,imgHm,imgMorph,imgOps,isodata,kalg,kBinOps,kBin,kbox,kcells,kCl,kEff,kFlat,kFmt,kGrid,khm,kimg,kIn,klab,kmorph,
  kNum,kout,kraster,kSI,kSP,kWithEdits,kwt,lohi,lum,lumLut,lutOf,maskLut,meanOf,otsuCalc,toGray,TR};
 })();

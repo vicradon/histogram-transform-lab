@@ -113,7 +113,7 @@ def run(path):
         br = p.chromium.launch()
         ctx = br.new_context(viewport={"width": 1280, "height": 1000})
         # test-only: no smooth scrolling, so screenshots never land mid-scroll
-        ctx.add_init_script("Element.prototype.scrollIntoView=function(){};")
+        ctx.add_init_script("Element.prototype.scrollIntoView=function(){}; history.scrollRestoration='manual';")
         pg = ctx.new_page()
         pg.on("pageerror", lambda e: out["errors"].append(str(e)))
         pg.goto(url); pg.wait_for_timeout(300)
@@ -169,6 +169,8 @@ def run(path):
         ev("document.querySelector('.tabs button[data-tab=kern]').click()"); pg.wait_for_timeout(300); snap("kern:new")
 
         def cellxy(card, cx, cy):
+            # bring the grid near the top of the viewport first: cells below the fold cannot receive mouse events
+            pg.evaluate("([i]) => { const r=__t.stepCard(i).querySelector('canvas.kcv').getBoundingClientRect(); window.scrollBy(0, r.top-90); }", [card])
             box = pg.evaluate("""([i]) => { const cv=__t.stepCard(i).querySelector('canvas.kcv'); const r=cv.getBoundingClientRect(); const G=Algos.kGrid(App.cur.k); const m=(cv.width/G.C-G.W)/2; return [r.left,r.top,r.width,r.height,G.W,G.H,m]; }""", [card])
             l, t, w, hh, kw, kh, m = box
             return (l + (cx + m + 0.5) / (kw + 2 * m) * w, t + (cy + m + 0.5) / (kh + 2 * m) * hh)

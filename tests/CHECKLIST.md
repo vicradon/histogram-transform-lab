@@ -11,4 +11,7 @@ Run `python3 tests/harness.py check histogram-lab.html` first. Then, in a real b
 - [ ] Kernels: paste a numeric grid with ∞ and load it
 - [ ] Ctrl+Z / Ctrl+Y work; they don't fire while typing in a text field
 - [ ] Toggle theme, reload: theme and all four tabs' sessions come back
+- [ ] Kernels, whole image: paste a photo into the Kernels tab; Apply erosion, a 7 x 7 top-hat (Algebra, Top-hat), then Stretch contrast
+- [ ] Kernels, whole image: Binary source with Otsu, drag the threshold (results dim until Apply), Sequential labeling then Relabel through table
+- [ ] Kernels, whole image: hover a result to read pixel values; reload and check applied steps come back
 - [ ] Phone width: no horizontal scroll, session strip scrolls sideways
