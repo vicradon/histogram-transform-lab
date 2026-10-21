@@ -11,19 +11,19 @@ It has four tabs:
 
 Sessions are saved in the browser (localStorage, plus IndexedDB for images).
 
-## Layout of `index.html`
+## Code layout
 
-The script is split into namespaced sections. Each section imports only from the sections above it:
+No build step. `index.html` holds the markup and loads plain scripts in this order (each file only uses the ones above it):
 
-| Section | Contents |
-|---|---|
-| `App` | shared state: the active tab and its sessions |
-| `Algos` | pure math, no DOM |
-| `Core` | sessions, persistence, undo/redo, theme, PDF helpers, tab registry |
-| `HistTab`, `BitsTab`, `KernTab`, `OtsuTab` | one per tab; each ends with `registerTab(...)` |
-| `Boot` | first render and restore |
+| File | Namespace | Contents |
+|---|---|---|
+| `css/styles.css` | | theme tokens, layout, shared controls, then one block per tab |
+| `js/algos.js` | `Algos` | pure math, no DOM |
+| `js/core.js` | `App`, `Core` | shared state; sessions, persistence, undo/redo, theme, PDF helpers, tab registry |
+| `js/tabs/*.js` | `HistTab`, `BitsTab`, `KernTab`, `OtsuTab` | one per tab; each ends with `registerTab(...)` |
+| `js/boot.js` | | first render and restore |
 
-To add a tab, add a section and register it with `registerTab(name, {render, paint, exportPdf?, thumb?, newSession?, noImages?})`.
+To add a tab, add a file under `js/tabs/`, load it in `index.html`, and register it with `registerTab(name, {render, paint, exportPdf?, thumb?, newSession?, noImages?})`.
 
 ## Tests
 
